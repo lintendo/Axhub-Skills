@@ -1,0 +1,10 @@
+{
+  "name": "@axhub/skills",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Axhub AI 技能集 - 独立可执行的自动化脚本",
+  "type": "module",
+  "scripts": {
+    "extract-axure": "node src/extract-axure-data.mjs"
+  }
+}
