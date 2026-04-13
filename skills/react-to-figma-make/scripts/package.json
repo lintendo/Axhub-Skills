@@ -1,0 +1,9 @@
+{
+  "name": "react-to-figma-make-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "kiwi-schema": "^0.4.0",
+    "pako": "^2.1.0"
+  }
+}
