@@ -15,7 +15,7 @@ TARGET_CLIENT_ID=""
 npx @axhub/genie status --json
 ```
 
-确认 `running: true`，记录 `endpoint.apiBaseUrl`。
+用于确认服务是否在线。关注 `running` 与 `endpoint.apiBaseUrl`。
 
 ## 2. 列出在线客户端
 
@@ -25,9 +25,6 @@ npx @axhub/genie editor clients list \
 ```
 
 重点关注：`clientId`、`sessionId`、`pageUrl`、`capabilities`、`source`。
-
-只有目标客户端在线且具备 `editor.*` 能力时，后续命令才有意义。
-
 Chrome 扩展客户端会在 `source` 字段标识为 `chrome-extension`。
 
 ## 3. 获取编辑器快照
@@ -179,41 +176,7 @@ npx @axhub/genie editor editing set \
 - `--session-id` 和 `--task-request-id` 可选，用于任务追踪
 - 结束后仍需重新读 `nodes list` 确认节点最终状态
 
-## 8. 推荐执行顺序
-
-```bash
-npx @axhub/genie status --json
-npx @axhub/genie editor clients list --channel "$CHANNEL"
-npx @axhub/genie editor snapshot --channel "$CHANNEL" --target-client-id "$TARGET_CLIENT_ID"
-npx @axhub/genie editor nodes list --channel "$CHANNEL" --target-client-id "$TARGET_CLIENT_ID" --status pending-dispatch,dirty
-```
-
-然后按节点循环：
-
-1. `editor editing set --state editing`
-2. 如有需要，拉 `context-images export`
-3. 如仍难定位，拉 `node screenshot`
-4. 修改代码
-5. 重新拉 `snapshot` 与 `nodes list`
-6. 成功 → `editor editing set --state completed`；失败 → `--state error`；异常 → `--state idle`
-
-## 9. 最终复核
-
-结束前至少再跑一次：
-
-```bash
-npx @axhub/genie editor nodes list \
-  --channel "$CHANNEL" \
-  --target-client-id "$TARGET_CLIENT_ID" \
-  --status pending-dispatch,dirty,error,editing
-```
-
-如果列表仍有项，区分说明：
-- 页面改动是否已完成
-- 编辑器 backlog 是否仍残留
-- 各节点的终态（`completed` / `error` / `idle`）
-
-## 10. CLI 通用参数
+## 8. CLI 通用参数
 
 | 参数 | 说明 |
 |------|------|

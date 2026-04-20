@@ -257,7 +257,3 @@ CLI 内置自动重试：`CONNECTION_ERROR` / `CONNECTION_CLOSED` / `REQUEST_TIM
 - 还有哪些节点仍未处理或状态异常
 
 ## 参考
-
-- `references/cli-reference.md` — CLI 命令模板和字段说明
-- `references/extension-setup.md` — Chrome 扩展安装与连接检测
-- `references/communication-resilience.md` — 通信稳定性详细说明
