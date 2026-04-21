@@ -8,6 +8,7 @@
 
 ## 基本口径
 
+- 这部分优先按宿主侧资源上下文接入，不把它写成 `@axhub/genie-editor-client` 包本身的能力
 - 应用层按最小参数接入，不展开全量协议
 - 默认只写 `filePath`、`targetPath`、`projectPath`
 - `title` 只有在页面很多、需要更快识别时再补
@@ -22,6 +23,13 @@
 - `title`：可选，给人看的页面名
 
 够用时就停，不要继续往里塞更多字段。
+
+接入位置保持这条口径：
+
+- `host.getResourceContext()`：把 `filePath`、`targetPath`、`projectPath` 写进 `meta`
+- `window.__GENIE_EDITOR_HOST__`：把 `filePath`、`targetPath`、`projectPath` 写在顶层
+
+`url` 不是页面协议核心字段。页面地址默认由运行时从 `window.location.href` 读取，不必当成必填接入项。
 
 ## 声明入口
 
@@ -46,7 +54,6 @@ createGenieEditor({
   host: {
     getResourceContext: () => ({
       kind: 'web-page',
-      url: window.location.href,
       meta: {
         filePath: 'src/components/button-demo/index.tsx',
         targetPath: 'components/button-demo',
@@ -64,13 +71,10 @@ createGenieEditor({
 <script>
   window.__GENIE_EDITOR_HOST__ = {
     kind: 'prototype',
-    url: window.location.href,
-    meta: {
-      filePath: 'src/prototypes/order-detail/index.tsx',
-      targetPath: 'prototypes/order-detail',
-      projectPath: '/Users/dev/my-project',
-      title: '订单详情页',
-    },
+    filePath: 'src/prototypes/order-detail/index.tsx',
+    targetPath: 'prototypes/order-detail',
+    projectPath: '/Users/dev/my-project',
+    title: '订单详情页',
   };
 </script>
 ```
