@@ -13,9 +13,9 @@ const MANIFEST_FILENAME = 'canvas.code-manifest.json';
 
 function printUsage() {
   console.log(`Usage:
-  node canvas-fig-sync.mjs inspect --fig <canvas.fig> [--manifest <file>]
-  node canvas-fig-sync.mjs extract --fig <canvas.fig> --out <project-dir> [--source-root src] [--manifest <file>]
-  node canvas-fig-sync.mjs pack --fig <canvas.fig> --from <project-dir> [--source-root src] [--out <new-canvas.fig>] [--manifest <file>] [--prune-missing] [--sanitize-for-export]
+  node scripts/canvas-fig-sync.mjs inspect --fig <canvas.fig> [--manifest <file>]
+  node scripts/canvas-fig-sync.mjs extract --fig <canvas.fig> --out <project-dir> [--source-root src] [--manifest <file>]
+  node scripts/canvas-fig-sync.mjs pack --fig <canvas.fig> --from <project-dir> [--source-root src] [--out <new-canvas.fig>] [--manifest <file>] [--prune-missing] [--sanitize-for-export]
 `);
 }
 
@@ -56,6 +56,22 @@ function getRequiredOption(options, key) {
 
 function resolvePath(value) {
   return path.resolve(value);
+}
+
+function sanitizePathForManifest(targetPath, baseDir = process.cwd()) {
+  const absoluteTargetPath = resolvePath(targetPath);
+  const absoluteBaseDir = resolvePath(baseDir);
+  const relativePath = toPosixPath(path.relative(absoluteBaseDir, absoluteTargetPath));
+
+  if (!relativePath) {
+    return '.';
+  }
+
+  if (path.posix.isAbsolute(relativePath) || relativePath.startsWith('../') || relativePath === '..') {
+    return path.basename(absoluteTargetPath);
+  }
+
+  return normalizeRelativePath(relativePath);
 }
 
 function sha1(content) {
@@ -477,7 +493,7 @@ function buildBaseManifest(command, figData, entries, sourceRoot) {
   return {
     command,
     generatedAt: new Date().toISOString(),
-    figPath: figData.figPath,
+    figPath: sanitizePathForManifest(figData.figPath),
     archive: {
       prelude: figData.prelude,
       version: figData.version,
@@ -546,14 +562,14 @@ function extractCommand(options) {
       sourceCodeSha1: entry.sourceCodeSha1,
       isDuplicate: entry.isDuplicate,
       duplicateCount: entry.duplicateCount,
-      extractedPath: outputFilePath,
+      extractedPath: sanitizePathForManifest(outputFilePath, outputDir),
       extractStatus: status,
     });
   }
 
   const manifest = {
     ...buildBaseManifest('extract', figData, entries, sourceRoot),
-    outputDirectory: outputDir,
+    outputDirectory: sanitizePathForManifest(outputDir),
     entries: manifestEntries,
   };
   writeManifest(manifestPath, manifest);
@@ -650,7 +666,7 @@ function packCommand(options) {
             sourceCodeSha1: entry.sourceCodeSha1,
             isDuplicate: entry.isDuplicate,
             duplicateCount: entry.duplicateCount,
-            packedPath: projectFilePath,
+            packedPath: sanitizePathForManifest(projectFilePath, projectDir),
             packStatus: 'pruned-missing-file',
           });
         }
@@ -667,7 +683,7 @@ function packCommand(options) {
           sourceCodeSha1: entry.sourceCodeSha1,
           isDuplicate: entry.isDuplicate,
           duplicateCount: entry.duplicateCount,
-          packedPath: projectFilePath,
+          packedPath: sanitizePathForManifest(projectFilePath, projectDir),
           packStatus: 'preserved-missing-file',
         });
       }
@@ -695,7 +711,7 @@ function packCommand(options) {
         sourceCodeSha1: nextSha1,
         isDuplicate: entry.isDuplicate,
         duplicateCount: entry.duplicateCount,
-        packedPath: projectFilePath,
+        packedPath: sanitizePathForManifest(projectFilePath, projectDir),
         packStatus: 'updated-from-disk',
       });
     }
@@ -726,8 +742,8 @@ function packCommand(options) {
 
   const manifest = {
     ...buildBaseManifest('pack', figData, finalEntries, sourceRoot),
-    projectDirectory: projectDir,
-    outputFigPath,
+    projectDirectory: sanitizePathForManifest(projectDir),
+    outputFigPath: sanitizePathForManifest(outputFigPath),
     updatedLogicalPathCount: updatedLogicalPaths.size,
     prunedLogicalPathCount: prunedLogicalPaths.size,
     sanitizeForExport: exportSanitization,

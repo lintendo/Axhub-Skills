@@ -15,7 +15,20 @@ description: "将任意 React 组件或应用转换为可在 Figma Make 中编�
 - **设计 Token 保留**：保持原始设计系统的 CSS 变量和主题定义
 - **资产完整性**：包含 `meta.json`、`ai_chat.json`、`images/` 等 Figma Make 要求的元文件
 
-本技能产出一个完整的 Figma Make 兼容项目目录，而非单个组件文件。
+本技能产出一个完整的 Figma Make 兼容项目目录，并默认把可被宿主工具消费的产物写入通用 artifact 目录：
+
+```text
+.axhub/make/artifacts/figma/<resource-id>/
+├── canvas.fig
+├── meta.json
+├── ai_chat.json
+├── canvas.code-manifest.json
+├── manifest.json
+├── images/
+└── thumbnail.png            # 可选
+```
+
+如果目标项目使用 `.axhub/make/project.json` 描述资源，需要在对应 `resources.prototypes[].artifacts.figma` 中登记这些路径，便于 make-server 或其他宿主直接导出 `.fig`。
 
 ## 何时使用
 
@@ -84,7 +97,7 @@ description: "将任意 React 组件或应用转换为可在 Figma Make 中编�
 
 ### 第 2 步：创建 Figma Make 项目结构
 
-在目标目录 `<output-dir>/<page-name>/` 下创建以下固定结构：
+在目标目录 `<output-dir>/<page-name>/` 下创建以下固定结构；最终可消费产物同步到 `.axhub/make/artifacts/figma/<resource-id>/`：
 
 ```text
 <page-name>/
@@ -106,6 +119,24 @@ description: "将任意 React 组件或应用转换为可在 Figma Make 中编�
     ├── pages/             # 多页面（如需要）
     └── styles/
         └── globals.css    # 全局样式 / 设计 Token
+```
+
+`.axhub/make/project.json` 中的资源元数据示例：
+
+```json
+{
+  "artifacts": {
+    "figma": {
+      "resourceId": "home",
+      "canvasFigPath": ".axhub/make/artifacts/figma/home/canvas.fig",
+      "metaPath": ".axhub/make/artifacts/figma/home/meta.json",
+      "aiChatPath": ".axhub/make/artifacts/figma/home/ai_chat.json",
+      "codeManifestPath": ".axhub/make/artifacts/figma/home/canvas.code-manifest.json",
+      "imagesDir": ".axhub/make/artifacts/figma/home/images",
+      "manifestPath": ".axhub/make/artifacts/figma/home/manifest.json"
+    }
+  }
+}
 ```
 
 **职责分层约束**（这是验收约束，不是建议）：

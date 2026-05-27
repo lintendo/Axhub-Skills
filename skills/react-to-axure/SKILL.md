@@ -19,6 +19,18 @@ description: "将任意 React 组件/应用改造为 Axure 可导入的原型组
 1. **配置声明**：5 组常量（EVENT_LIST / ACTION_LIST / VAR_LIST / CONFIG_LIST / DATA_LIST）
 2. **运行时封装**：使用 `forwardRef` + `useImperativeHandle` 包装的组件代码
 
+同时，面向宿主工具消费的 Axure 导出产物默认写入通用 artifact 目录：
+
+```text
+.axhub/make/artifacts/axure/<resource-id>/
+├── index-bundle.json
+├── axure-json.json
+├── cover.svg
+└── manifest.json
+```
+
+如果目标项目使用 `.axhub/make/project.json` 描述资源，需要在对应 `resources.prototypes[].artifacts.axure` 中登记这些路径，便于 make-server 或其他宿主直接读取、复制和下载。
+
 ## 何时使用
 
 - 你有一个现成的 React 组件，希望在 Axure 原型中使用
@@ -31,6 +43,22 @@ description: "将任意 React 组件/应用改造为 Axure 可导入的原型组
 
 - `references/axure-types.ts`：核心接口（AxureProps、AxureHandle）和工具函数
 - `references/config-panel-types.ts`：配置面板组件的完整类型定义
+
+`.axhub/make/project.json` 中的资源元数据示例：
+
+```json
+{
+  "artifacts": {
+    "axure": {
+      "caseId": "home",
+      "manifestPath": ".axhub/make/artifacts/axure/home/manifest.json",
+      "indexBundlePath": ".axhub/make/artifacts/axure/home/index-bundle.json",
+      "axureJsonPath": ".axhub/make/artifacts/axure/home/axure-json.json",
+      "coverSvgPath": ".axhub/make/artifacts/axure/home/cover.svg"
+    }
+  }
+}
+```
 
 ## 改造工作流程
 
