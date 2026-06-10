@@ -4,7 +4,7 @@ description: >
   从网页中采集设计令牌并生成完整的 DESIGN.md 设计规范文档 + Tailwind CSS 主题文件。
   当用户提供 URL 并要求"提取主题"、"生成设计规范"、"导出设计系统"、
   "提取这个网站的设计令牌"、"帮我做一个主题"、"分析这个页面的设计风格"时使用。
-  产出包含 DESIGN.md（Google Stitch 格式）和 globals.css（Tailwind CSS v4），
+  产出包含 DESIGN.md（getdesign.md / DESIGN.md 9 段式标准）和 globals.css（Tailwind CSS v4），
   每个 token 类别均有推荐/允许/禁止三级规范，可直接放入项目根目录供 AI 编码工具使用。
 ---
 
@@ -21,7 +21,7 @@ description: >
 
 ### Step 1: 采集设计数据 + 截图
 
-使用 `extract-page-data` 或 `clone-page` 技能采集 theme.json + 多维度截图：
+使用 `extract-page-data` 或 `clone-page` 技能采集 theme.json + 多维度截图；也可以使用 Playwright、浏览器自动化、in-app Browser/Chrome 或其他等效工具替代，只要能稳定产出截图、响应式截图和 token/样式证据即可：
 
 ```bash
 # 方式 A: extract-page-data（快速采集）
@@ -79,7 +79,7 @@ node <clone-page>/scripts/clone.mjs <url> styles -o ./theme-data --selector "foo
    - 组件的具体形态（按钮样式、卡片样式、表单样式）
    - 图片和装饰的使用方式
 
-**分析结果应直接写入 DESIGN.md 的「设计原则」和「视觉风格」章节。**
+**分析结果应直接写入 DESIGN.md 的「视觉主题与氛围」「布局与间距」「组件规范」「响应式行为」等章节。**
 
 ### Step 3: 分析 theme.json
 
@@ -109,7 +109,7 @@ cat theme-data/theme.json
 
 ```
 <output>/
-├── DESIGN.md            # 设计规范文档（Google Stitch / DESIGN.md 格式）
+├── DESIGN.md            # 设计规范文档（getdesign.md / DESIGN.md 9 段式标准）
 ├── globals.css          # Tailwind CSS v4 主题定义
 └── screenshots/         # 视觉参考截图
     ├── full-page.png    # 全页截图
@@ -124,9 +124,25 @@ cat theme-data/theme.json
 
 ## DESIGN.md 生成规范
 
-**格式遵循 Google Stitch 的 DESIGN.md 标准**：纯 Markdown，面向 AI 和人类双重可读。
+**格式参考 getdesign.md / DESIGN.md 标准**：纯 Markdown，面向 AI 和人类双重可读。`DESIGN.md` 必须是可执行的设计规范，不能只写氛围描述。
+
+### 强制 9 段式内容
+
+生成的 `DESIGN.md` 必须覆盖以下 9 个部分；缺少来源证据时，明确写“未采集到明确规则，按保守默认处理”，不要伪造品牌规则或组件细节。
+
+1. **视觉主题与氛围**：品牌/产品背景、适用场景、不适用场景、关键词、页面气质、信息密度和品牌表达边界。
+2. **色彩系统**：hex 值、语义角色、使用边界、禁用场景和 Tailwind/CSS 变量映射。
+3. **字体系统**：display/body/mono 角色、字体族、字号层级、行高、字重、字距和 fallback。
+4. **组件规范**：按钮、输入框、卡片、导航、表格、标签、弹窗等基础组件的尺寸、圆角、边框、状态和交互行为。
+5. **布局与间距**：容器宽度、栅格、section 节奏、密度、断点前默认布局、间距标尺和页面级留白。
+6. **深度、阴影与边框**：阴影层级、边框/分割线、ring、elevation、表面叠放规则和禁止的过重装饰。
+7. **动效**：时长、缓动、transform 模式、出现/退出/hover 规则，以及可用和禁用动效。
+8. **响应式行为**：desktop/tablet/mobile 布局变化、导航折叠、元素显隐、图片/表格/卡片重排策略。
+9. **Prompt guide**：给 LLM 的现成生成指令，包含推荐写法、禁止写法和可直接复用的界面生成提示。
 
 ### 文档结构模板
+
+下面模板是基础结构；生成时必须按上面的 9 段式补齐，不能遗漏组件、深度/边框、响应式和 Prompt guide。
 
 ```markdown
 # [品牌名] 设计系统
@@ -360,6 +376,27 @@ focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors
 - 使用 `!important`
 - 内联样式代替 Tailwind 类
 - 未定义的 magic number（如 `margin: 13px`）
+
+---
+
+## Prompt guide
+
+### 推荐指令
+
+- 使用本 DESIGN.md 中的语义颜色、字体、圆角、阴影和间距 token。
+- 先还原整体布局节奏，再微调组件状态。
+- 按响应式行为处理 desktop/tablet/mobile，不让内容溢出。
+
+### 禁止指令
+
+- 不要硬编码未登记色值、字体、圆角、阴影或间距。
+- 不要使用低对比度文本、过度阴影或与品牌无关的装饰。
+- 不要忽略组件的 hover/focus/disabled 状态。
+
+### 可直接复用的生成提示
+
+- "Design a [页面/组件] using this DESIGN.md: apply the semantic palette, typography roles, layout rhythm, component states, and responsive behavior."
+- "Before finalizing, check every visible color, font, radius, shadow, motion, and spacing against this DESIGN.md."
 ```
 
 ---

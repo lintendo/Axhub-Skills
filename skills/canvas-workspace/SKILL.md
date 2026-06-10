@@ -1,11 +1,11 @@
 ---
 name: canvas-workspace
-description: 在 Axhub 画布上进行原型草图绘制、整理灵感、构思方案、画布整理、读取批注/截图/本地图片资源。当用户要在画布上绘图、发散/收敛想法、构思原型/图片/内容/图表、整理画布，或把画布图片作为生成参考/素材文件时使用。
+description: 仅当任务明确涉及 Axhub 画布、原型草稿、Excalidraw 画布文件、画布节点/批注/截图/图片，或需要在画布/原型草稿中创建、整理、读取 Drawio 图表时使用。
 ---
 
 # Canvas Workspace — 画布工作区
 
-Axhub 画布基于 Excalidraw，支持标准绘图元素和两种 Axhub 专属节点（原型节点、文档节点），以及元素级批注。本技能覆盖画布的读、写和多种工作场景。
+Axhub 画布基于 Excalidraw，支持标准绘图元素和两种 Axhub 专属节点（原型节点、文档节点），以及元素级批注。本技能只覆盖明确的画布、原型草稿和画布内 Drawio 图表场景。
 
 ## 核心概念
 
@@ -93,6 +93,7 @@ src/prototypes/<name>/canvas-assets/embed-<elementId>.png
 
 ## 通用规范
 
+- 用户正在处理画布时，相关图片、原型页面、Markdown/Draw.io 文档、图表等产物原则上应落入或更新到当前画布，便于用户确认。
 - `roughness: 0` — 干净利落的线条（除非用户要求手绘风格）
 - `fontFamily: 3` — Cascadia（等宽字体，适合技术内容）
 - `fontFamily: 1` — Virgil（手绘风格）
