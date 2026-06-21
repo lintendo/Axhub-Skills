@@ -1,0 +1,101 @@
+{
+  "documentVersion": 1,
+  "format": "axhub-annotation-source",
+  "data": {
+    "version": 2,
+    "prototypeName": "standalone-annotation-demo",
+    "pageId": "overview",
+    "updatedAt": 1779667200000,
+    "nodes": [
+      {
+        "id": "overview-hero",
+        "index": 1,
+        "title": "运行时总览",
+        "pageId": "overview",
+        "locator": {
+          "selectors": ["[data-annotation-id=\"overview-hero\"]"],
+          "fingerprint": "section|overview-hero",
+          "path": []
+        },
+        "aiPrompt": "说明独立页面如何接入标注运行时。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1779667200000,
+        "updatedAt": 1779667200000
+      },
+      {
+        "id": "state-card",
+        "index": 2,
+        "title": "结果状态",
+        "pageId": "states",
+        "locator": {
+          "selectors": ["[data-annotation-id=\"state-card\"]"],
+          "fingerprint": "article|state-card",
+          "path": []
+        },
+        "aiPrompt": "演示标注 controls 如何驱动页面状态。",
+        "annotationText": "在标注面板里切换结果状态，页面应该同步展示成功或失败。",
+        "hasMarkdown": false,
+        "color": "#059669",
+        "images": [],
+        "controls": [
+          {
+            "type": "segmented",
+            "attributeId": "result_state",
+            "displayName": "结果状态",
+            "initialValue": "success",
+            "options": [
+              { "label": "成功", "value": "success" },
+              { "label": "失败", "value": "failure" }
+            ]
+          }
+        ],
+        "createdAt": 1779667200000,
+        "updatedAt": 1779667200000
+      }
+    ]
+  },
+  "markdownMap": {
+    "overview-hero": "# 独立接入说明\n\n`@axhub/annotation` 只负责运行时展示。宿主页面负责提供数据源、稳定选择器和目录 route 行为。"
+  },
+  "assetMap": {},
+  "directory": {
+    "nodes": [
+      {
+        "type": "folder",
+        "id": "demo-root",
+        "title": "示例目录",
+        "defaultExpanded": true,
+        "children": [
+          {
+            "type": "route",
+            "id": "route-overview",
+            "title": "运行时总览",
+            "route": "overview"
+          },
+          {
+            "type": "route",
+            "id": "route-states",
+            "title": "状态标注",
+            "route": "states"
+          },
+          {
+            "type": "markdown",
+            "id": "doc-usage",
+            "title": "接入说明",
+            "markdown": "# 接入说明\n\nReact 使用 `AnnotationViewer`；普通 HTML 使用 `createAnnotationViewer`。"
+          },
+          {
+            "type": "link",
+            "id": "docs-link",
+            "title": "包文档",
+            "href": "https://www.npmjs.com/package/@axhub/annotation",
+            "target": "blank"
+          }
+        ]
+      }
+    ]
+  }
+}

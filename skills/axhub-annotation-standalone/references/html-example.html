@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Axhub Annotation HTML Example</title>
+  </head>
+  <body>
+    <nav>
+      <button type="button" data-route="overview">运行时总览</button>
+      <button type="button" data-route="states">状态标注</button>
+    </nav>
+
+    <section data-page="overview">
+      <section data-annotation-id="overview-hero">
+        <h1>@axhub/annotation</h1>
+        <p>这是一个普通 HTML 宿主接入示例。</p>
+      </section>
+    </section>
+
+    <section data-page="states" hidden>
+      <article data-annotation-id="state-card">
+        <strong data-result-label>成功</strong>
+        <h2 data-result-title>发布完成</h2>
+        <p>在标注面板里切换结果状态，页面会同步变化。</p>
+      </article>
+    </section>
+
+    <script type="module" src="./html-example.ts"></script>
+  </body>
+</html>

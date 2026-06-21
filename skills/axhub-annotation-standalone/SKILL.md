@@ -1,75 +1,40 @@
 ---
 name: axhub-annotation-standalone
-description: Use when integrating @axhub/annotation outside Axhub Make, including standalone React apps, plain HTML pages, Vite prototypes, or non-Make hosts that need annotation markers, directories, or state controls.
+description: Use when adding @axhub/annotation to standalone React apps, plain HTML pages, Vite prototypes, or other web hosts that need annotation markers, directories, Markdown notes, or state controls.
 ---
 
 # Axhub Annotation Standalone
 
-在 Axhub Make 以外使用 `@axhub/annotation` 时，用这个技能。它只说明运行时接入方式：页面已有标注数据，只需要展示 marker、标注面板、目录和状态控件。
+在独立 Web 项目中使用 `@axhub/annotation` 时，用这个技能。它只说明运行时接入：页面已有标注数据，只需要展示 marker、标注面板、目录和状态控件。
 
-不要假设 Make 客户端目录、`/prototypes/*` 路由、Make 预览命令或 Make 专属 helper。
+## 参考案例
 
-## 接入选择
-
-| 宿主 | 使用方式 | 参考文件 |
+| 宿主 | 使用方式 | 文件 |
 | --- | --- | --- |
-| React | `AnnotationViewer` 组件 | `packages/axhub-annotation/examples/react/src/App.tsx` |
-| 普通 HTML / DOM | `createAnnotationViewer` | `packages/axhub-annotation/examples/html/src/main.ts` |
-| 共享数据 | `AnnotationSourceDocument` JSON | `packages/axhub-annotation/examples/shared/annotation-source.json` |
+| React | `AnnotationViewer` 组件 | `references/react-example.tsx` |
+| 普通 HTML / DOM | `createAnnotationViewer` | `references/html-example.html` + `references/html-example.ts` |
+| 数据源 | `AnnotationSourceDocument` JSON | `references/annotation-source.json` |
 
 ## 接入前提
 
-- 宿主需要提供 React 18 和 ReactDOM 18。
+- 安装 `@axhub/annotation`，并确保项目里有 React 18 / ReactDOM 18。
 - 使用能导入 ESM/TS/JSON 的构建工具，例如 Vite。
-- 标注数据用一份 `AnnotationSourceDocument`，静态 import 或由宿主 loader 返回。
-- 被标注元素要有稳定选择器，优先加 `data-annotation-id`。
+- 标注数据使用一份 `AnnotationSourceDocument`，静态 import 或由宿主 loader 返回。
+- 被标注元素优先加稳定属性，例如 `data-annotation-id`。
 
 ## React 接入
 
-```tsx
-import { AnnotationViewer, type AnnotationSourceDocument } from '@axhub/annotation';
-import annotationSource from './annotation-source.json';
-
-<AnnotationViewer
-  source={annotationSource as AnnotationSourceDocument}
-  options={{
-    currentPageId,
-    showToolbar: true,
-    showThemeToggle: true,
-    showColorFilter: true,
-    onDirectoryRoute: (node) => setCurrentPageId(String(node.route || 'overview')),
-  }}
-/>
-```
-
-如果标注 `controls` 要驱动页面状态，用 `useProtoDevState()` 读取控件值并渲染页面。
+- 挂载 `AnnotationViewer`。
+- 多页面时传 `options.currentPageId`。
+- 目录 `route` 在 `options.onDirectoryRoute` 中交给宿主切页。
+- 状态标注用 `useProtoDevState()` 读取 `controls` 值。
 
 ## 普通 HTML 接入
 
-```ts
-import { createAnnotationViewer, type AnnotationSourceDocument } from '@axhub/annotation';
-import annotationSource from './annotation-source.json';
-
-let currentPageId = 'overview';
-
-const viewer = createAnnotationViewer({
-  source: annotationSource as AnnotationSourceDocument,
-  options: {
-    getCurrentPageId: () => currentPageId,
-    showToolbar: true,
-    showThemeToggle: true,
-    showColorFilter: true,
-    onDirectoryRoute: (node) => {
-      currentPageId = String(node.route || currentPageId);
-      viewer.refresh();
-    },
-  },
-});
-
-void viewer.start();
-```
-
-普通 HTML 的状态控件：viewer 启动后订阅 `window.__AXHUB_PROTO_DEV__`，从 `getState()` 读值并更新 DOM。
+- 用 `createAnnotationViewer()` 创建运行时。
+- 用 `getCurrentPageId` 返回当前页面。
+- 切页后调用 `viewer.refresh()`。
+- 状态控件可订阅 `window.__AXHUB_PROTO_DEV__`，从 `getState()` 读值并更新 DOM。
 
 ## 数据要点
 
@@ -90,7 +55,6 @@ void viewer.start();
 
 ## 常见错误
 
-- 不要在外部宿主里使用 Make-only 路径、脚本或 `/prototypes/<id>` 假设。
 - 不要把函数写进 JSON controls。
 - 不要依赖脆弱的生成 CSS 选择器；能加 `data-annotation-id` 就加。
 - 不要期待 `route` 自动跳转；宿主必须在 `onDirectoryRoute` 里处理。
