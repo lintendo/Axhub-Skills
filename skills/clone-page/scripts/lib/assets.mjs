@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import https from 'node:https';
 import http from 'node:http';
+import { createInjectedFunctionBody } from './injected-function.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -66,11 +67,12 @@ export async function runAssets(page, outputDir, options = {}) {
     path.join(__dirname, '..', 'inject', 'extract-assets.js'),
     'utf-8',
   );
+  const injectFunctionBody = createInjectedFunctionBody(injectScript);
 
-  const assetData = await page.evaluate((script) => {
-    const fn = new Function('return ' + script)();
+  const assetData = await page.evaluate(({ script }) => {
+    const fn = new Function(script)();
     return fn();
-  }, injectScript);
+  }, { script: injectFunctionBody });
 
   const stats = { images: 0, fonts: 0, svgs: 0, failed: 0 };
 

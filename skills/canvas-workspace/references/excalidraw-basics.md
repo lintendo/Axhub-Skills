@@ -1,5 +1,7 @@
 # Excalidraw 基础指导
 
+仅当用户明确要求 Excalidraw、手绘风、线框草图或普通画布元素绘制时读取本文件。流程图、关系图、思维导图、架构图、数据流图等图表默认使用 Draw.io / drawio 节点。
+
 这份只说明如何把内容组织成 Excalidraw 图，不规定 Axhub 画布流程。基础思路参考 `excalidraw-diagram-generator`：先判断图类型，再抽取元素、关系和复杂度，最后生成清晰布局。
 
 参考来源：https://www.skills.sh/github/awesome-copilot/excalidraw-diagram-generator

@@ -5,7 +5,7 @@ description: 仅当任务明确涉及 Axhub 画布、原型草稿、Excalidraw �
 
 # Canvas Workspace — 画布工作区
 
-Axhub 画布基于 Excalidraw，支持标准绘图元素和两种 Axhub 专属节点（原型节点、文档节点），以及元素级批注。本技能只覆盖明确的画布、原型草稿和画布内 Drawio 图表场景。
+Axhub 画布基于 Excalidraw，支持标准绘图元素、Axhub 预览节点、图片/Drawio 节点，以及元素级批注。本技能只覆盖明确的画布、原型草稿和画布内 Drawio 图表场景。
 
 ## 核心概念
 
@@ -27,19 +27,21 @@ http://localhost:<port>/?projectId=<project-id>&p=<prototype-name>&v=canvas
 
 例如 `http://localhost:53817/?projectId=make-project&p=rpa&v=canvas`。端口和 `projectId` 以当前项目运行环境为准。
 
-### Axhub 专属节点
+### Axhub 预览节点
 
-**原型节点** — 嵌入可交互的原型预览：
+新建嵌入类节点统一叫预览节点，可承载原型、设计主题、Markdown/HTML 文档、图片资源入口或任意 URL：
 - `type: "embeddable"`
-- `link` → 原型 URL（如 `http://localhost:<port>/prototypes/<name>`）
-- `customData.title` → 原型标题
-- `customData.screenshotUrl` → 截图持久化地址
+- `customData.resourceType: "preview"` — 新节点统一写这个值
+- `customData.sourceResourceType` — 仅当来源是本地资源时写 `prototype`、`doc` 或 `theme`
+- `customData.previewKind` — `web`、`doc`、`image` 或 `none`，决定渲染方式
+- `customData.previewUrl` / `customData.openUrl` / `link` — 可预览或打开的 URL，普通 preview 节点允许任意链接
+- `customData.title` → 节点标题
 
-**文档节点** — 嵌入 Markdown 文档：
-- `type: "embeddable"`
-- `customData.type: "axhub-doc"`
-- `link` → 文档 API URL（`/api/markdown-file?path=<encoded-path>`）
-- `customData.title` → 文档标题
+来源示例：
+- 原型来源：`resourceType: "preview"` + `sourceResourceType: "prototype"` + `previewKind: "web"`
+- 文档来源：`resourceType: "preview"` + `sourceResourceType: "doc"` + `previewKind: "doc"`，Markdown 可继续使用 `customData.type: "axhub-doc"`
+- 主题来源：`resourceType: "preview"` + `sourceResourceType: "theme"` + `previewKind: "web"`，可继续使用 `customData.type: "axhub-theme"`
+- 任意链接：`resourceType: "preview"`，不写 `sourceResourceType`，`previewUrl` 直接放目标 URL
 
 ### 批注
 
@@ -49,7 +51,7 @@ http://localhost:<port>/?projectId=<project-id>&p=<prototype-name>&v=canvas
 
 ### 图片与截图资源
 
-原型节点的截图保存在：
+原型来源预览节点的截图通常保存在：
 ```
 src/prototypes/<name>/canvas-assets/embed-<elementId>.png
 ```
@@ -57,37 +59,34 @@ src/prototypes/<name>/canvas-assets/embed-<elementId>.png
 画布里的图片资源可能有三种用途：
 - **视觉参考**：作为生成、改版、还原时的上下文参考，不一定写入代码。
 - **素材文件**：用户明确要“用这张图”“把画布里的图片作为素材”时，需要保留/复制本地图片文件，并在实现中引用。
-- **节点截图缓存**：原型节点自动生成的预览图，主要用于画布展示和视觉核对。
+- **节点截图缓存**：预览节点自动生成的预览图，主要用于画布展示和视觉核对。
 
-## 场景分流
+## 分流规则
 
-根据用户意图选择对应参考文档：
-
-| 信号 | 场景 | 参考文档 |
-|------|------|----------|
-| 绘制草图、UI 布局、流程图、架构图、线框图 | 原型草图 | `references/prototype-sketch.md` |
-| 整理灵感、构思方案、发散/收敛想法、生成原型/图片/内容/图表 | 灵感与方案 | `references/ideation-planning.md` |
-| 整理画布、清理删除、分类排布、优化布局 | 画布整理 | `references/canvas-cleanup.md` |
+- 画布读写：优先 Axhub Canvas MCP；无 MCP 或能力不覆盖时直接读写 `.excalidraw`。
+- 图表：流程图、关系图、思维导图、架构图、数据流图默认使用 Draw.io / drawio 节点。
+- Excalidraw：只有用户明确要求 Excalidraw、手绘风、线框草图或普通画布元素时，才读取 `references/excalidraw-basics.md`。
+- 结构化元素：需要 Excalidraw JSON 模板时，读取 `references/element-templates.md`。
 
 ### 生成意图澄清
 
 用户说“生成图片”“生成 UI 设计稿”“做一张图”时，必须先判断输出形态：
 - 可能是画布草图，也可能是真实图片、位图设计稿或素材图。
-- 如果需要真实图片，使用图片生成相关工具/技能生成图片。
+- 当前画布不提供 AI 图片节点；如果需要图片素材，只使用普通图片资源放回画布。
 - 无论最终生成的是草图还是图片，相关内容都要呈现在画布上，便于用户确认。
 - 不清楚用户要草图还是真实图片时，马上停下来问用户，不要擅自二选一。
 
-如果场景涉及画布读写操作的具体细节（CLI 命令、文件格式、Bridge 通信），读取 `references/canvas-read-write.md`。
+### 读写分流
 
-如果需要 Excalidraw 画图基础指导（图类型、布局、复杂度控制），读取 `references/excalidraw-basics.md`。
+如果当前环境暴露 Axhub Canvas MCP，优先读取 `references/canvas-mcp.md` 并通过 MCP 操作画布。
 
-如果需要创建 Excalidraw 元素的 JSON 模板，读取 `references/element-templates.md`。
+只有 MCP 不存在、连接失败、能力不覆盖，或需要离线/批量/修复 `.excalidraw` 文件时，才读取 `references/canvas-read-write.md`。
 
 ## 读写能力速查
 
-优先直接读写 `.excalidraw`。CLI 只用于读取批注、获取当前画布截图、查看在线连接，或热更新异常时兜底。
+优先级：Axhub Canvas MCP → 直接读写 `.excalidraw` 文件。
 
-> 详细的读写参考见 `references/canvas-read-write.md`。
+不要使用画布 CLI。MCP 可用才读 MCP 分文档；无 MCP 时直接走文件兜底。
 
 每个元素必须有唯一 `id`。推荐使用 `<timestamp>-<random>` 格式（如 `"1778336862857-19qh357"`），与现有画布保持一致。
 
@@ -102,12 +101,13 @@ src/prototypes/<name>/canvas-assets/embed-<elementId>.png
 - 元素间距：水平 200-300px，垂直 100-150px
 - 文本 fontSize 至少 16px 确保可读性
 - 相关内容必须用 `frame` 元素分组，组内元素通过 `frameId` 归属到对应 Frame
+- 清理画布时直接移除废弃元素，不新增 `isDeleted: true`
 
 ## 交付要求
 
 完成画布操作后，回复至少包含：
 
-- 命中的场景
+- 处理路径（MCP / 文件兜底 / Draw.io / Excalidraw）
 - 更改的内容
 - 可用于用户确认的画布链接（如果当前环境能确定）
 - 询问用户是否需要清理相关已处理标注

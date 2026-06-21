@@ -1,17 +1,15 @@
-# 画布读写能力参考
+# 画布文件读写
 
-面向使用 Skill 的 Agent：优先读写本地 `.excalidraw` 文件；只有需要查看在线连接、获取当前画布截图、或热更新异常排查时才使用 CLI。
+仅在 Axhub Canvas MCP 不存在、连接失败、能力不覆盖，或需要离线/批量/修复文件时读取本文件。
 
 ## 快速判断
 
-| 目标 | 优先方式 |
-|------|----------|
-| 读取画布元素、批注、节点信息 | 直接读 `.excalidraw` |
-| 修改画布内容 | 直接改 `.excalidraw` |
-| 从用户给的画布链接定位元素 | 从链接提取画布名和元素 ID，再读文件 |
-| 获取当前浏览器里画布的截图 | `axhub-make canvas screenshot` |
-| 检查浏览器是否连接画布 | `axhub-make canvas info` |
-| 画布没有自动同步 | `axhub-make canvas refresh` 兜底 |
+| 目标 | 方式 |
+|------|------|
+| 读取画布元素、批注、节点信息 | 读 `.excalidraw` |
+| 批量修改画布内容 | 改 `.excalidraw` |
+| 从画布链接定位元素 | 提取画布名和元素 ID，再读文件 |
+| 修复脏数据或历史删除元素 | 结构化编辑 JSON |
 
 ## 文件位置
 
@@ -30,8 +28,6 @@ src/prototypes/<prototype-name>/canvas-assets/embed-<elementId>.png
 
 ## 读取画布
 
-优先直接读本地文件，不需要浏览器和服务。
-
 最常用字段：
 
 | 字段 | 用途 |
@@ -40,43 +36,23 @@ src/prototypes/<prototype-name>/canvas-assets/embed-<elementId>.png
 | `type` | 元素类型，如 `text`、`image`、`embeddable`、`arrow` |
 | `x` / `y` / `width` / `height` | 位置和尺寸 |
 | `isDeleted` | 为 true 时跳过 |
-| `link` | 原型节点或文档节点链接 |
-| `customData` | 批注、标题、截图地址等 Axhub 扩展信息 |
+| `link` | 预览节点的打开链接或预览链接 |
+| `customData` | 批注、标题、预览来源、截图地址等 Axhub 扩展信息 |
 | `fileId` | 图片元素对应的 `files[fileId]` |
 
 识别常见节点：
 
 | 类型 | 判断方式 |
 |------|----------|
-| 原型节点 | `type == "embeddable"` 且 `link` 含 `/prototypes/` |
-| 文档节点 | `type == "embeddable"` 且 `customData.type == "axhub-doc"` |
+| 预览节点 | `type == "embeddable"` 且 `customData.resourceType == "preview"` |
+| 原型来源预览 | `customData.sourceResourceType == "prototype"` |
+| 文档来源预览 | `customData.sourceResourceType == "doc"` |
+| 主题来源预览 | `customData.sourceResourceType == "theme"` |
+| Draw.io 节点 | `type == "image"` 且 `customData.type == "axhub-drawio"` |
 | 图片元素 | `type == "image"` |
 | 批注元素 | `customData.annotation` 有值 |
 
-## CLI 读取
-
-CLI 只在它比读文件更合适时使用。
-
-读取批注：
-
-```bash
-axhub-make canvas annotations -c prototypes/my-proto/canvas
-axhub-make canvas annotations
-axhub-make canvas annotations -s 3600
-```
-
-查看在线画布：
-
-```bash
-axhub-make canvas info
-```
-
-获取当前画布截图：
-
-```bash
-axhub-make canvas screenshot -o ./canvas.png
-axhub-make canvas screenshot -c prototypes/my-proto/canvas -o ./canvas.png
-```
+嵌入类节点统一写 `customData.resourceType: "preview"`。
 
 ## 从链接定位
 
@@ -85,8 +61,8 @@ axhub-make canvas screenshot -c prototypes/my-proto/canvas -o ./canvas.png
 1. 从 URL 中提取画布名和元素 ID。
 2. 找到对应 `.excalidraw` 文件。
 3. 在 `elements` 中找同 ID 元素。
-4. 如果是原型节点，预览截图通常在 `canvas-assets/embed-<elementId>.png`。
-5. 如果是图片元素，按 `fileId` 找 `files[fileId]`，或结合 `ideation-planning.md` 判断是否需要导出/复制为素材。
+4. 如果是原型来源预览节点，预览截图通常在 `canvas-assets/embed-<elementId>.png`。
+5. 如果是图片元素，按 `fileId` 找 `files[fileId]`；只有用户明确要作为素材使用时，才导出或复制为稳定文件引用。
 
 ## 写入画布
 
@@ -119,13 +95,8 @@ axhub-make canvas screenshot -c prototypes/my-proto/canvas -o ./canvas.png
 - `startBinding` / `endBinding`
 - `groupIds`
 
-## 热更新
+## 同步
 
-当前画布支持热更新。写入 `.excalidraw` 后，正在打开的画布通常会自动同步，不要把刷新命令作为默认收尾动作。
+当前画布支持热更新。写入 `.excalidraw` 后，正在打开的画布通常会自动同步，不要默认触发刷新。
 
-只有热更新没有生效、浏览器连接异常、或需要排查在线状态时，才使用：
-
-```bash
-axhub-make canvas refresh -c prototypes/my-proto/canvas
-axhub-make canvas refresh
-```
+如果热更新没有生效，且 MCP 可用，使用 `canvas_refresh`；否则告知用户刷新浏览器页面。

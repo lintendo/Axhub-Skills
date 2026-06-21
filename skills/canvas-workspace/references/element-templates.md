@@ -119,7 +119,7 @@
 
 同时在被绑定元素的 `boundElements` 中添加箭头引用。
 
-## 原型节点
+## 预览节点
 
 ```json
 {
@@ -127,14 +127,22 @@
   "type": "embeddable",
   "x": 100,
   "y": 100,
-  "width": 375,
-  "height": 812,
-  "link": "http://localhost:<port>/prototypes/<name>",
+  "width": 720,
+  "height": 480,
+  "link": "<open-url-or-preview-url>",
   "customData": {
-    "title": "原型标题",
-    "aspectRatioPreset": "mobile"
+    "title": "预览标题",
+    "previewUrl": "<preview-url>",
+    "openUrl": "<open-url-or-preview-url>",
+    "previewKind": "web",
+    "resourceType": "preview",
+    "resourceId": "<optional-resource-id>",
+    "embedViewMode": "preview",
+    "embedSizePreset": "free",
+    "storedPreviewSize": { "width": 720, "height": 480 },
+    "previewStrokeColor": "#008F5D"
   },
-  "strokeColor": "#1e1e1e",
+  "strokeColor": "#008F5D",
   "backgroundColor": "transparent",
   "roughness": 0,
   "opacity": 100,
@@ -149,25 +157,33 @@
 }
 ```
 
-截图字段由运行时维护。不要手写 `screenshotUrl`，除非正在修复已有截图缓存。
+新建嵌入类节点统一使用 `customData.resourceType: "preview"`。`previewUrl` 可以是任意 HTTP(S)、相对路径或本地预览 API URL；如果只是外部/任意链接，不要写 `sourceResourceType`。
 
-## 文档节点
+### 原型来源预览
 
 ```json
 {
   "id": "<id>",
   "type": "embeddable",
-  "x": 500,
+  "x": 100,
   "y": 100,
-  "width": 420,
-  "height": 640,
-  "link": "/api/markdown-file?path=<url-encoded-absolute-path>",
+  "width": 1280,
+  "height": 800,
+  "link": "/prototypes/<name>",
   "customData": {
-    "type": "axhub-doc",
-    "title": "文档标题",
-    "previewUrl": "/api/markdown-file?path=<url-encoded-absolute-path>"
+    "title": "原型标题",
+    "previewUrl": "/prototypes/<name>",
+    "openUrl": "/prototypes/<name>",
+    "previewKind": "web",
+    "resourceType": "preview",
+    "sourceResourceType": "prototype",
+    "resourceId": "<name>",
+    "embedViewMode": "preview",
+    "embedSizePreset": "desktop",
+    "storedPreviewSize": { "width": 1280, "height": 800 },
+    "previewStrokeColor": "#008F5D"
   },
-  "strokeColor": "#1e1e1e",
+  "strokeColor": "#008F5D",
   "backgroundColor": "transparent",
   "roughness": 0,
   "opacity": 100,
@@ -179,6 +195,28 @@
   "groupIds": [],
   "frameId": null,
   "boundElements": null
+}
+```
+
+截图字段由运行时维护。不要手写 `screenshotUrl`，除非正在修复已有截图缓存。
+
+### 文档或 HTML 来源预览
+
+Markdown 文档可保留 `customData.type: "axhub-doc"`，HTML 或任意可访问文档可用 `previewKind: "web"`。
+
+```json
+{
+  "customData": {
+    "type": "axhub-doc",
+    "title": "文档标题",
+    "previewUrl": "/api/markdown-file?path=<url-encoded-path>",
+    "openUrl": "/api/markdown-file?path=<url-encoded-path>",
+    "previewKind": "doc",
+    "resourceType": "preview",
+    "sourceResourceType": "doc",
+    "resourceId": "<doc-id-or-path>",
+    "embedViewMode": "preview"
+  }
 }
 ```
 

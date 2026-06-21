@@ -5,6 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInjectedFunctionBody } from './injected-function.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,14 +19,14 @@ export async function runSkeleton(page, outputDir, options = {}) {
     path.join(__dirname, '..', 'inject', 'extract-skeleton.js'),
     'utf-8',
   );
+  const injectFunctionBody = createInjectedFunctionBody(injectScript);
 
   const skeleton = await page.evaluate(
-    (script, selector) => {
-      const fn = new Function('return ' + script)();
+    ({ script, selector }) => {
+      const fn = new Function(script)();
       return fn(selector);
     },
-    injectScript,
-    rootSelector,
+    { script: injectFunctionBody, selector: rootSelector },
   );
 
   if (skeleton.error) {

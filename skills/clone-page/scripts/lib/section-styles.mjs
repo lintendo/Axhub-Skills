@@ -5,6 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInjectedFunctionBody } from './injected-function.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -40,14 +41,14 @@ export async function runSectionStyles(page, outputDir, options = {}) {
     path.join(__dirname, '..', 'inject', 'extract-section-styles.js'),
     'utf-8',
   );
+  const injectFunctionBody = createInjectedFunctionBody(injectScript);
 
   const result = await page.evaluate(
-    (script, sel) => {
-      const fn = new Function('return ' + script)();
-      return fn(sel);
+    ({ script, selector }) => {
+      const fn = new Function(script)();
+      return fn(selector);
     },
-    injectScript,
-    selector,
+    { script: injectFunctionBody, selector },
   );
 
   if (result.error) {
