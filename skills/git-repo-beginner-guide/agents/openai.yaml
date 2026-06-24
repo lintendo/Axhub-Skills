@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git 仓库新手引导"
+  short_description: "用非技术用户听得懂的方式引导 Git/GitHub/GitLab/Gitee 仓库协作。"
+  default_prompt: "帮我用面向非技术用户的方式完成仓库初始化、授权、提交、同步或版本恢复。"
