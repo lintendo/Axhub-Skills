@@ -28,6 +28,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 - 多页面时传 `options.currentPageId`。
 - 目录 `route` 在 `options.onDirectoryRoute` 中交给宿主切页。
 - 状态标注用 `useProtoDevState()` 读取 `controls` 值。
+- 发布为带源码 HTML 后，发布产物会注入 `sourceReference`，指向 `source/manifest.json`；宿主接入代码不需要生成它。
 
 ## 普通 HTML 接入
 
@@ -39,10 +40,14 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 ## 数据要点
 
 - `directory.nodes` 放 `folder` / `route` / `markdown` / `link`，不需要 `locator`。
+- `type: "markdown"` 目录文档可以直接写 `markdown` 正文。
+- 需要把目录文档拆成 `.md` 文件时，可以写 `markdownPath`，例如 `docs/prd-03-status.md`；这是构建侧约定，运行时仍读取内联后的 `markdown`。
+- `markdownPath` 只用于目录文档，不用于 marker 标注节点。
 - `data.nodes[]` 放页面 marker，必须有能在宿主页面解析到的 `locator`。
 - marker 只属于某些页面或状态时，写 `pageId`。
 - 长正文用 `hasMarkdown: true` + `markdownMap[node.id]`。
 - 状态标注写节点 `controls`；JSON 里只放可序列化字段。
+- `sourceReference` 不放在 JSON 数据源里，只描述发布包中的源码清单位置，不内联源码文件。
 
 ## 验收
 
