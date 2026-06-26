@@ -12,15 +12,22 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 | 宿主 | 使用方式 | 文件 |
 | --- | --- | --- |
 | React | `AnnotationViewer` 组件 | `references/react-example.tsx` |
-| 普通 HTML / DOM | `createAnnotationViewer` | `references/html-example.html` + `references/html-example.ts` |
+| 普通 HTML / DOM | browser bundle + `window.AxhubAnnotation.createAnnotationViewer` | `references/html-example.html` + `references/html-example.ts` |
 | 数据源 | `AnnotationSourceDocument` JSON | `references/annotation-source.json` |
 
 ## 接入前提
 
-- 安装 `@axhub/annotation`，并确保项目里有 React 18 / ReactDOM 18。
-- 使用能导入 ESM/TS/JSON 的构建工具，例如 Vite。
 - 标注数据使用一份 `AnnotationSourceDocument`，静态 import 或由宿主 loader 返回。
 - 被标注元素优先加稳定属性，例如 `data-annotation-id`。
+- React 18 / Vite 等现代宿主可以安装 `@axhub/annotation` 并走 ESM。
+- 普通 HTML、DOM-only、React 17、Vue、Angular、托管注入或 `file://` 静态页，优先走 standalone browser bundle，不要求宿主安装 React / ReactDOM / antd。
+
+## 入口选择
+
+- 用户明确说 React 18、Vite、ESM 或已有前端工程时，使用 `AnnotationViewer` 或 ESM `createAnnotationViewer`。
+- 用户说普通 HTML、静态 HTML、DOM、无构建、`file://`、只想打开 HTML 看效果，必须使用 `dist/browser/axhub-annotation.global.js`。
+- HTML 模式只接入包提供的 runtime：`window.AxhubAnnotation.createAnnotationViewer(...)`。
+- 不要在宿主里手写 marker、浮层面板、目录、Markdown 渲染或状态控件的等价 UI；如果缺少 browser bundle，先构建或复制 bundle，而不是重做 UI。
 
 ## React 接入
 
@@ -32,10 +39,14 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 
 ## 普通 HTML 接入
 
-- 用 `createAnnotationViewer()` 创建运行时。
+- 从 npm 包或本仓库构建产物复制 `dist/browser/axhub-annotation.global.js` 到静态资源目录。
+- 在页面里先加载 `<script src="/path/to/axhub-annotation.global.js"></script>`。
+- 用 `window.AxhubAnnotation.createAnnotationViewer()` 创建运行时。
 - 用 `getCurrentPageId` 返回当前页面。
 - 切页后调用 `viewer.refresh()`。
 - 状态控件可订阅 `window.__AXHUB_PROTO_DEV__`，从 `getState()` 读值并更新 DOM。
+- 参考示例里的 `html-example.ts` 仍可用 Vite 处理 JSON import；纯静态页则把标注数据内联到脚本或从同源 URL fetch。
+- 如果页面必须直接用 `file://` 打开，避免依赖跨文件 fetch/import；运行时仍然必须来自 browser bundle。
 
 ## 数据要点
 
@@ -61,5 +72,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 ## 常见错误
 
 - 不要把函数写进 JSON controls。
+- 不要为了让静态页可见而手写标注 UI；HTML 模式也必须使用 `@axhub/annotation` 的 browser runtime。
+- 不要在普通 HTML 模式里先跳到 Vite/ESM 接入；最短路径是 browser bundle + `window.AxhubAnnotation.createAnnotationViewer(...)`。
 - 不要依赖脆弱的生成 CSS 选择器；能加 `data-annotation-id` 就加。
 - 不要期待 `route` 自动跳转；宿主必须在 `onDirectoryRoute` 里处理。
