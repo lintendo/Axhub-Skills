@@ -12,7 +12,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 | 宿主 | 使用方式 | 文件 |
 | --- | --- | --- |
 | React | `AnnotationViewer` 组件 | `references/react-example.tsx` |
-| 普通 HTML / DOM | browser bundle + `window.AxhubAnnotation.createAnnotationViewer` | `references/axhub-annotation.global.js` + `references/html-example.html` + `references/html-example.ts` |
+| 普通 HTML / DOM | browser bundle + `window.AxhubAnnotation.createAnnotationViewer` | `references/axhub-annotation.global.js` + `references/html-example.html` |
 | 数据源 | `AnnotationSourceDocument` JSON | `references/annotation-source.json` |
 
 ## 接入前提
@@ -45,7 +45,6 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 - 用 `getCurrentPageId` 返回当前页面。
 - 切页后调用 `viewer.refresh()`。
 - 状态控件可订阅 `window.__AXHUB_PROTO_DEV__`，从 `getState()` 读值并更新 DOM。
-- 参考示例里的 `html-example.ts` 仍可用 Vite 处理 JSON import；纯静态页则把标注数据内联到脚本或从同源 URL fetch。
 - 如果页面必须直接用 `file://` 打开，避免依赖跨文件 fetch/import；运行时仍然必须来自 browser bundle。
 
 ## 数据要点
