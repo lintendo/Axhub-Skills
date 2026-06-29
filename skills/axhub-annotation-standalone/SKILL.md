@@ -12,7 +12,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 | 宿主 | 使用方式 | 文件 |
 | --- | --- | --- |
 | React | `AnnotationViewer` 组件 | `references/react-example.tsx` |
-| 普通 HTML / DOM | browser bundle + `window.AxhubAnnotation.createAnnotationViewer` | `references/html-example.html` + `references/html-example.ts` |
+| 普通 HTML / DOM | browser bundle + `window.AxhubAnnotation.createAnnotationViewer` | `references/axhub-annotation.global.js` + `references/html-example.html` + `references/html-example.ts` |
 | 数据源 | `AnnotationSourceDocument` JSON | `references/annotation-source.json` |
 
 ## 接入前提
@@ -25,7 +25,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 ## 入口选择
 
 - 用户明确说 React 18、Vite、ESM 或已有前端工程时，使用 `AnnotationViewer` 或 ESM `createAnnotationViewer`。
-- 用户说普通 HTML、静态 HTML、DOM、无构建、`file://`、只想打开 HTML 看效果，必须使用 `dist/browser/axhub-annotation.global.js`。
+- 用户说普通 HTML、静态 HTML、DOM、无构建、`file://`、只想打开 HTML 看效果，必须使用 browser bundle，可从本 skill 的 `references/axhub-annotation.global.js` 或 npm 包 / 本地构建产物里的 `dist/browser/axhub-annotation.global.js` 复制。
 - HTML 模式只接入包提供的 runtime：`window.AxhubAnnotation.createAnnotationViewer(...)`。
 - 不要在宿主里手写 marker、浮层面板、目录、Markdown 渲染或状态控件的等价 UI；如果缺少 browser bundle，先构建或复制 bundle，而不是重做 UI。
 
@@ -39,8 +39,8 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 
 ## 普通 HTML 接入
 
-- 从 npm 包或本仓库构建产物复制 `dist/browser/axhub-annotation.global.js` 到静态资源目录。
-- 在页面里先加载 `<script src="/path/to/axhub-annotation.global.js"></script>`。
+- 从 npm 包、本地构建产物或本 skill 的 `references/axhub-annotation.global.js` 复制 browser bundle 到静态资源目录；npm / 本地构建路径为 `dist/browser/axhub-annotation.global.js`。
+- 在页面里先加载 `<script src="./axhub-annotation.global.js"></script>`，实际路径按静态资源目录调整。
 - 用 `window.AxhubAnnotation.createAnnotationViewer()` 创建运行时。
 - 用 `getCurrentPageId` 返回当前页面。
 - 切页后调用 `viewer.refresh()`。
