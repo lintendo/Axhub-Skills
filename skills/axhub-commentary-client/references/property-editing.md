@@ -4,7 +4,7 @@
 
 ## 目标
 
-为目标元素或页面现有 tweak-capable 节点补齐可编辑的 `schema / values / adapter / update` 能力，让 Genie Editor 能读取并回写这些属性。
+为目标元素或页面现有 tweak-capable 节点补齐可编辑的 `schema / values / adapter / update` 能力，让 Axhub Commentary 的调整面板能读取并回写这些属性。
 
 这不是把组件全部 props 原样摊开，而是把真正有用、可读、可维护的编辑能力暴露出来。
 
@@ -15,7 +15,7 @@
 - 要以“给用户惊喜”为目标，充分发挥前端和 AI 的能力，但不要为了炫技牺牲可读性和可维护性
 - 宿主负责业务字段、默认值和更新语义
 - 编辑器只消费 `schema / values / update` 结果，不替宿主决定业务字段
-- Genie 后端不在线时，也可以直接在当前项目中完成属性实现
+- 不要求安装编辑器 runtime；默认由 Axhub Chrome 扩展或 Make 预览环境提供编辑器
 
 需要快速确认字段类型和推荐场景时，读 `references/schema-guide.md`。
 
@@ -80,7 +80,7 @@
 
 - 给目标元素补 `schema`
 - 提供当前 `values`
-- 通过 `adapter` 绑定到元素
+- 通过 `adapter` 绑定到元素，并注册到 `window.__AXHUB_COMMENTARY_TWEAK_PROTOCOL__`
 - 让 `update` 能把 patch 正确回写到宿主状态
 
 ### 2. 页面级属性聚合
@@ -101,5 +101,6 @@
 
 - 术语尽量对齐 `schema`、`values`、`adapter`、`update`
 - 优先复用现有 tweak protocol 和宿主状态，不另造一套平行配置体系
+- React 宿主如果已经可用 `@axhub/commentary-react`，优先用它的 `useRegisterCommentaryTweak` / `createCommentaryReactTweakStore`
 - 字段结构发生变化但没有重建注册时，记得考虑刷新 editor 对 tweak 列表的可见性
 - 如果当前环境支持子代理，可把具体组件实现拆出去；主代理仍保留整体约束与最终复核

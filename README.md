@@ -14,8 +14,7 @@
 | **`extract-axure-data`** | **Axure 宇宙解析器** | *“分析这个 Axure 原型链接，深入提取它的精确截图、设计 Token、交互地图和所有的设计标注信息。”* |
 | **`extract-page-data`** | **通用网页深度 X 光机** | *“打开这个页面，帮我输出长截图、提取页面视觉色板代码，并把文案骨架直接转成 Markdown。”* |
 | **`generate-theme`** | **设计系统自动发电机** | *“分析特定页面的视觉风格，直接生成能够用于开发的 `DESIGN.md` 设计体系规范和 Tailwind v4 主题文件。”* |
-| **`genie-editor-client`** | **调整面板属性建模器** | *“帮我把这个页面/元素的 tweak、schema、values、adapter 接上，让它能在 Genie Editor 的调整面板里直接改，并支持页面级属性聚合或多方案 card 切换。”* |
-| **`genie-editor-workflow`** | **可视化交互闭环生命线** | *“检测一下我在浏览器版 Genie Editor 上的新标注卡片，作为处理者接管这些待办，改完代码后切回完成状态。”* |
+| **`axhub-commentary-client`** | **Commentary 页面侧接入器** | *“帮我给这个页面补资源上下文和 tweak 协议，让 Axhub Chrome 扩展或 Make 预览里的调整面板能定位页面、读取属性并回写。”* |
 | **`git-repo-beginner-guide`** | **Git 仓库新手协作向导** | *“我不熟 Git，帮我把这个项目安全提交到 GitHub / GitLab，并告诉我哪些地方需要确认授权或处理冲突。”* |
 | **`react-to-figma-make`** | **Figma Make 离线铸造师** | *“这个 React 项目开发完了，帮我逆向转换为 Figma Make 项目格式，并打包出可直接扔进 Figma 客户端呈现的 `.fig` 二进制文件。”* |
 | **`mcp-installer`** | **上下文协议 (MCP) 极速装配** | *“这里有一个提供服务的工具包，帮我自动化一键将这套 MCP 协议安装并兼容配置到当前主控的 AI IDE 中。”* |

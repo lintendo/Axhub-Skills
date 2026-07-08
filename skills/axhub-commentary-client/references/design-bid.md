@@ -87,8 +87,8 @@
 
 优先做法：
 
-- 使用 `@axhub/genie-editor-client`
-- 通过宿主的 `schema / values / adapter / update` 暴露方案选择
+- 通过页面侧 Commentary tweak protocol 暴露方案选择
+- React 宿主如果已经可用 `@axhub/commentary-react`，可以用它注册 store / adapter；否则直接注册到 `window.__AXHUB_COMMENTARY_TWEAK_PROTOCOL__`
 - 方案字段优先使用 `card` 类型，而不是普通下拉
 
 `card` 适合表达“多方向里选其一”的比稿切换。一般每个选项至少包含：
@@ -139,5 +139,5 @@
 - 差异是否来自可变化维度，而不是违背锁定约束
 - 是否至少在结构或交互层存在实质差异
 - 最终是否明确给出推荐推进方向
-- 如果需要页面内切换，是否已经通过 `@axhub/genie-editor-client` 暴露为 `card` 类型 tweak
+- 如果需要页面内切换，是否已经通过 Commentary tweak protocol 暴露为 `card` 类型 tweak
 - `card` 选项是否都有可读标题和简洁描述

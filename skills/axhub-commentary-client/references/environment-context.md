@@ -8,7 +8,7 @@
 
 ## 基本口径
 
-- 这部分优先按宿主侧资源上下文接入，不把它写成 `@axhub/genie-editor-client` 包本身的能力
+- 这部分优先按页面侧资源上下文接入，不要求用户安装编辑器包
 - 应用层按最小参数接入，不展开全量协议
 - 默认只写 `filePath`、`targetPath`、`projectPath`
 - `title` 只有在页面很多、需要更快识别时再补
@@ -26,20 +26,20 @@
 
 接入位置保持这条口径：
 
-- `host.getResourceContext()`：把 `filePath`、`targetPath`、`projectPath` 写进 `meta`
-- `window.__GENIE_EDITOR_HOST__`：把 `filePath`、`targetPath`、`projectPath` 写在顶层
+- `window.__COMMENTARY_HOST__`：页面侧推荐声明入口，把 `filePath`、`targetPath`、`projectPath` 写在顶层
+- `host.getResourceContext()`：只有当前项目本来就手动初始化 Commentary runtime 时使用，把这些字段写进 `meta`
 
 `url` 不是页面协议核心字段。页面地址默认由运行时从 `window.location.href` 读取，不必当成必填接入项。
 
 ## 声明入口
 
-### 1. 可控初始化代码时，优先 `host.getResourceContext()`
+### 1. 页面侧声明时，优先 `window.__COMMENTARY_HOST__`
 
 这是默认做法。
 
-### 2. 只能走开放协议时，用 `window.__GENIE_EDITOR_HOST__`
+### 2. 可控初始化代码时，用 `host.getResourceContext()`
 
-这是页面侧最简声明入口。
+只有页面自己初始化 Commentary runtime 时才需要。
 
 ### 3. 只有静态 HTML 时，再退回 `<meta>` 或 `data-genie-*`
 
@@ -47,10 +47,24 @@
 
 ## 最佳实践
 
-### 1. 代码侧最简写法
+### 1. 页面协议最简写法
+
+```html
+<script>
+  window.__COMMENTARY_HOST__ = {
+    kind: 'prototype',
+    filePath: 'src/prototypes/order-detail/index.tsx',
+    targetPath: 'prototypes/order-detail',
+    projectPath: '/Users/dev/my-project',
+    title: '订单详情页',
+  };
+</script>
+```
+
+### 2. 代码侧最简写法
 
 ```ts
-createGenieEditor({
+createCommentary({
   host: {
     getResourceContext: () => ({
       kind: 'web-page',
@@ -63,20 +77,6 @@ createGenieEditor({
     }),
   },
 });
-```
-
-### 2. 页面协议最简写法
-
-```html
-<script>
-  window.__GENIE_EDITOR_HOST__ = {
-    kind: 'prototype',
-    filePath: 'src/prototypes/order-detail/index.tsx',
-    targetPath: 'prototypes/order-detail',
-    projectPath: '/Users/dev/my-project',
-    title: '订单详情页',
-  };
-</script>
 ```
 
 ## 实施提醒
