@@ -1,13 +1,13 @@
 ---
 name: react-to-figma-make
-description: "将任意 React 组件或应用转换为可在 Figma Make 中编辑和导出的标准项目结构。适用于已有 React 项目需要导入 Figma Make 进行可视化编辑、团队协作或产出 .fig 文件的场景。当用户提到将 React 转为 Figma、导出 Figma Make、生成 .fig 文件、或希望在 Figma Make 中编辑现有 React 代码时使用。"
+description: "Use when 需要把现有 React、Vite、Next.js、V0 或 AI Studio 页面转换为 Figma Make 可导入的 .fig 资产，或补齐、更新、验证已有 Figma Make 导出壳和 canvas.fig。"
 ---
 
 # React 导出到 Figma Make
 
 ## 概述
 
-本技能将帮助你把**任意 React 组件或应用**转换为符合 Figma Make 项目规范的标准结构。转换完成后，项目将具备：
+本技能将帮助你把 React 组件或应用经过兼容改造后，转换为符合 Figma Make 项目规范的标准结构。转换完成后，项目将具备：
 
 - **Figma Make 可编辑性**：可在 Figma Make 平台中打开、编辑和迭代
 - **`.fig` 导出能力**：生成可下载的 `.fig` 文件
@@ -30,6 +30,26 @@ description: "将任意 React 组件或应用转换为可在 Figma Make 中编�
 
 如果目标项目使用 `.axhub/make/project.json` 描述资源，需要在对应 `resources.prototypes[].artifacts.figma` 中登记这些路径，便于 make-server 或其他宿主直接导出 `.fig`。
 
+## 核心原则与当前能力边界
+
+**`canvas-fig-sync.mjs pack` 是模板节点同步器，不是通用的文件系统导入器。**
+
+- `pack` 只更新 `canvas.fig` 中已经存在的 `CODE_FILE.logicalPath`。
+- 磁盘上新增但模板中不存在的路径不会自动变成新的 `CODE_FILE`。
+- 使用 `--prune-missing` 时，模板中存在、磁盘上不存在的路径会被删除。
+- 使用 `--sanitize-for-export` 时，聊天历史和代码快照会被清空；如果源码映射错误，无法依赖清理后的 `.fig` 恢复源码。
+- `inspect` 命令退出成功只证明二进制可解析，不证明源码完整或能够运行。
+
+因此，首次生成前必须先 inspect 模板，并让导出源码路径与模板已有逻辑路径对齐。路径由实际 template manifest 决定，不是 Figma Make 的固定文件名。当前 bundled `empty-canvas.fig` 中可以确认的通用入口和可选路径包括：
+
+| 磁盘路径（相对 `--from`） | `CODE_FILE.logicalPath` | 职责 |
+|---|---|---|
+| `src/App.tsx` | `App.tsx` | 当前模板的 Figma Make 入口，必须保留 |
+| `src/styles/globals.css` | `styles/globals.css` | 当前模板已有的可选样式节点 |
+| `src/<manifest 中已有路径>` | 对应 `logicalPath` | 可选业务模块或其他资源 |
+
+当前模板中的 `components/Dashboard.tsx` 只是一个历史示例槽位，不是通用规范，也不代表目标页面必须是 Dashboard。只有当本次转换明确选择该现有槽位时才能使用它。如果原页面依赖多个模板未覆盖的本地模块，优先使用项目现有构建工具把业务代码机械打包到 `src/App.tsx`，或打包到本次从 manifest 中明确选定的已有槽位。不要把业务逻辑手工重写成另一套实现；保留原页面入口，把导出壳作为可重复生成、可持续同步的独立适配层。
+
 ## 何时使用
 
 - 你有一个现成的 React 项目，希望导入 Figma Make 进行可视化编辑
@@ -45,7 +65,7 @@ description: "将任意 React 组件或应用转换为可在 Figma Make 中编�
 2. **canvas.fig 生成与验证**：本技能内置了相关的操作脚本，位于技能自身的目录下：
    - `scripts/canvas-fig-sync.mjs`：canvas.fig 回写与检查工具
    - `assets/empty-canvas.fig`：空白 canvas 模板
-   （运行脚本前，请先在技能的 `scripts` 目录下执行 `npm install` 安装依赖 `pako` 和 `kiwi-schema`。）
+   - 脚本运行依赖 `pako` 和 `kiwi-schema`。先直接运行一次；如果出现 `ERR_MODULE_NOT_FOUND`，在脚本所属包中按宿主项目规定的包管理器安装依赖。Axhub Runtime 仓库内必须使用 `pnpm`，不要向目标原型的运行时依赖中添加这两个包。
 
 如果有额外的页面渲染验收脚本，也可以在此阶段执行。
 
@@ -115,7 +135,7 @@ description: "将任意 React 组件或应用转换为可在 Figma Make 中编�
     ├── App.tsx            # Figma Make 导出薄壳（导出入口）
     ├── main.tsx           # Vite 挂载层
     ├── index.css          # Figma Make 入口样式
-    ├── components/        # 页面视觉与交互主体
+    ├── components/        # 可选；仅使用 template manifest 已存在的路径
     ├── pages/             # 多页面（如需要）
     └── styles/
         └── globals.css    # 全局样式 / 设计 Token
@@ -164,10 +184,10 @@ description: "将任意 React 组件或应用转换为可在 Figma Make 中编�
  */
 import './style.css';
 import React from 'react';
-import AppContent from './src/components/AppContent';
+import App from './src/App';
 
 export default function PageName() {
-  return <AppContent />;
+  return <App />;
 }
 ```
 
@@ -176,13 +196,14 @@ export default function PageName() {
 ```tsx
 /**
  * Figma Make 导出薄壳
- * 复用 components/ 中的共享组件，保持与根目录 index.tsx 同步
+ * 将根入口及其本地依赖机械同步到这个入口，
+ * 或同步到 template manifest 中明确存在的其他逻辑路径。
  */
 import React from 'react';
-import AppContent from './components/AppContent';
+import './styles/globals.css';
 
 export default function App() {
-  return <AppContent />;
+  return <main>{/* 机械同步或打包后的页面主体 */}</main>;
 }
 ```
 
@@ -208,7 +229,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 **关键原则**：
 
 - 两个入口（`index.tsx` 和 `src/App.tsx`）必须渲染相同的页面内容
-- 页面真实视觉和交互主体应沉淀到 `src/components/**`
+- 页面主体可以直接机械打包到 `src/App.tsx`，也可以拆分到 template manifest 已存在的逻辑路径
+- 不要硬编码 `Dashboard.tsx`、`AppContent.tsx` 或其他项目语义文件名；先检查模板再选择路径
+- 不要创建模板中不存在的路径后假设 `pack` 会自动加入
 - 若源项目有多页路由，收敛为单页面或选择核心页面
 
 #### 3.2 处理框架特定代码
@@ -451,38 +474,64 @@ export default defineConfig({
 
 ### 第 5 步：生成 `canvas.fig`
 
-> 运行本步骤前，请确保已经在技能包的 `scripts/` 目录下执行过 `npm install` 以安装依赖。
+> 在执行任何带 `--prune-missing` 的命令前，必须先完成导出壳和模板路径映射。不要用正式 `canvas.fig` 直接试错。
 
 使用本技能自带的 `canvas-fig-sync.mjs` 脚本生成可导出的 `.fig` 文件。
 
 以下命令假设你当前在终端中定位在目标项目根目录，且本技能的存放位置为 `<skill-dir>`：
 
-**首次生成**（没有现有 `canvas.fig`）：
+**首次生成**（没有现有 `canvas.fig`）按以下顺序执行：
+
+1. inspect 空白模板，确认本次准备使用的逻辑路径确实存在。
+2. 在目标源码目录内创建并保留模板兼容的 `src/**` 导出壳。
+3. 将空白模板复制为候选文件，在候选文件上 pack。
+4. 验证候选文件的节点、引用和可运行性，通过后再替换正式 `canvas.fig`。
 
 ```bash
-# ① 从模板创建基础 canvas.fig
-cp <skill-dir>/assets/empty-canvas.fig <output-dir>/<page-name>/canvas.fig
-
-# ② 将源码回写到 canvas.fig
-node <skill-dir>/scripts/canvas-fig-sync.mjs pack \
-  --fig <output-dir>/<page-name>/canvas.fig \
-  --from <output-dir>/<page-name> \
-  --prune-missing \
-  --sanitize-for-export
-
-# ③ 生成 manifest
+# ① 检查模板已有 CODE_FILE 路径
 node <skill-dir>/scripts/canvas-fig-sync.mjs inspect \
-  --fig <output-dir>/<page-name>/canvas.fig \
-  --manifest <output-dir>/<page-name>/canvas.code-manifest.json
+  --fig <skill-dir>/assets/empty-canvas.fig \
+  --manifest <artifact-dir>/template.code-manifest.json
+
+# ② 使用 Node 跨平台复制模板，避免覆盖正式产物
+node -e "require('node:fs').copyFileSync(process.argv[1], process.argv[2])" \
+  <skill-dir>/assets/empty-canvas.fig \
+  <artifact-dir>/canvas.candidate.fig
+
+# ③ 将已经对齐模板路径的源码写入候选文件
+node <skill-dir>/scripts/canvas-fig-sync.mjs pack \
+  --fig <artifact-dir>/canvas.candidate.fig \
+  --from <source-dir> \
+  --prune-missing \
+  --sanitize-for-export \
+  --manifest <artifact-dir>/canvas.pack-manifest.json
+
+# ④ 生成候选文件的最终 CODE_FILE 清单
+node <skill-dir>/scripts/canvas-fig-sync.mjs inspect \
+  --fig <artifact-dir>/canvas.candidate.fig \
+  --manifest <artifact-dir>/canvas.code-manifest.json
 ```
 
+`<source-dir>` 是包含持久化 `src/App.tsx` 的页面源码目录；`<artifact-dir>` 是 `.axhub/make/artifacts/figma/<resource-id>/`。两者通常不是同一个目录。Make 服务端下载时会再次以 `<source-dir>` 执行 pack，因此不能在首次生成后删除导出壳。
+
+在提升候选文件为正式 `canvas.fig` 前，读取两个 manifest 并强制满足：
+
+- `canvas.pack-manifest.json.updatedLogicalPathCount > 0`
+- `canvas.code-manifest.json.summary.totalCodeFiles > 0`
+- `canvas.code-manifest.json.entries` 包含 `App.tsx` 以及 `App.tsx` 的全部本地相对依赖
+- pack warnings 中不存在 `Unresolved relative import`
+- 除 `App.tsx` 外，只要求本次导出入口实际引用的模板已有路径；不要要求固定存在 `Dashboard.tsx`
+
+任何一项不满足都必须停止，不要覆盖已有 `canvas.fig`，也不要把空壳记录为成功导出。验证通过后再用跨平台文件操作把 `canvas.candidate.fig` 替换为 `canvas.fig`。
+
 **参数说明**：
-- `<output-dir>`：项目输出目录，根据你的项目约定选择（如 `src/prototypes`、`src/pages` 等）
+- `<source-dir>`：页面源码目录；脚本会从其 `src/` 子目录读取代码
+- `<artifact-dir>`：Figma Make 资产目录，不等同于源码目录
 - `--prune-missing`：裁掉磁盘上不存在的旧 `CODE_FILE` 节点
 - `--sanitize-for-export`：清空旧聊天/历史缓存，重建 `importedCodeFiles`
 
 **canvas.fig 关键特性**：
-- 二进制 ZIP 格式文件，内含 Figma 节点树和 CODE_FILE 节点
+- `fig-make` 专用二进制容器，内含 Figma 节点树和 CODE_FILE 节点；不是普通 ZIP
 - 不可手动编辑，仅能通过 `canvas-fig-sync.mjs` 的 pack / inspect / extract 命令操作
 - 文件大小通常在几百 KB 到几 MB，取决于代码文件数量
 - 每次页面内容变更后需要重新 pack，否则导出的 `.fig` 会与当前页面不一致
@@ -510,6 +559,12 @@ node <skill-dir>/scripts/canvas-fig-sync.mjs inspect \
 - [ ] `canvas.fig` 存在
 - [ ] `canvas.code-manifest.json` 存在
 - [ ] inspect 命令可成功执行
+- [ ] pack manifest 的 `updatedLogicalPathCount > 0`
+- [ ] `summary.totalCodeFiles > 0`
+- [ ] manifest 包含入口及其全部本地相对依赖
+- [ ] pack warnings 不包含 `Unresolved relative import`
+- [ ] 用 `extract` 反向提取到临时目录，关键源码与导出壳内容一致
+- [ ] 实际下载接口返回的二进制与正式 `canvas.fig` 一致；不能只以 `probe.hasMakeAssets === true` 作为内容验收
 
 **样式验证**：
 - [ ] `style.css` 和 `src/index.css` 使用同一套样式来源
@@ -545,12 +600,13 @@ npm run dev   # 启动 Vite 开发服务器
 
 这是最简单的场景，因为源项目和目标结构都基于 Vite。
 
-1. 复制 `src/` 目录内容到目标 `src/`
-2. 将 `App.tsx` 改造为薄壳模式
-3. 创建根目录 `index.tsx`
-4. 迁移样式到 `src/styles/globals.css`
-5. 补齐元文件
-6. 生成 `canvas.fig`
+1. inspect 模板，确认可用的 `CODE_FILE.logicalPath`
+2. 保留原业务入口，创建模板兼容的薄导出壳
+3. 将业务主体及本地依赖机械打包到 `src/App.tsx`，或同步到本次选定的模板已有路径
+4. 创建根目录 `index.tsx`
+5. 迁移样式到 `src/styles/globals.css`
+6. 补齐元文件
+7. 生成 `canvas.fig`
 
 ### 场景 B：Next.js 项目（V0 等）
 
@@ -576,8 +632,8 @@ npm run dev   # 启动 Vite 开发服务器
 1. 检查 `index.tsx`（根入口）和 `src/App.tsx`（导出壳子）是否同步
 2. 如果不同步，让 `src/App.tsx` 复用根入口的共享组件
 3. **不要删除**已有的 `canvas.fig`、`meta.json`、`images/` 等原始资产
-4. 重新执行 pack 回写 `canvas.fig`
-5. 刷新 `canvas.code-manifest.json` 和 `meta.json.exported_at`
+4. pack 到候选文件并完成严格验证，不要直接覆盖原始 `canvas.fig`
+5. 验证通过后替换正式文件，刷新 `canvas.code-manifest.json` 和 `meta.json.exported_at`
 
 ## 常见注意点
 
@@ -590,6 +646,8 @@ npm run dev   # 启动 Vite 开发服务器
 ### 入口同步
 - 修改根目录页面后，必须同步更新 `src/App.tsx`，否则导出的 `.fig` 会与当前页面不一致
 - 两个入口长期不同步是最常见的"漂移"问题 — 保持 `src/App.tsx` 尽量薄，只做包装
+- 默认模板不能自动新增任意本地文件路径；新增拆分文件前先检查 template manifest
+- `inspect` 成功但 `totalCodeFiles` 为 0、入口依赖缺失或存在 unresolved import，仍然是失败产物
 
 ### 依赖和路径
 - 不要继续保留对 `package@version` alias 的运行时依赖
