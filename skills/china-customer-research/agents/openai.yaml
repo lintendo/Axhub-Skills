@@ -1,0 +1,4 @@
+interface:
+  display_name: "中国市场客户研究"
+  short_description: "按中国、海外或混合市场路由信源，提炼可信客户需求与产品机会"
+  default_prompt: "Use $china-customer-research to research customer needs with an appropriate China, global, or hybrid source strategy."
