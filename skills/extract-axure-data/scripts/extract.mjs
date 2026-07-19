@@ -17,6 +17,14 @@ import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 
+import {
+  buildDefaultPageResourceBaseUrl,
+  buildPageUrl,
+  normalizeBaseUrl,
+  parseAxureRouteContext,
+  resolvePageResourceBaseUrl,
+} from './routing.mjs';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -142,10 +150,11 @@ async function extractSitemap(baseUrl) {
   return { sitemap, pages, logo };
 }
 
-async function extractPageData(baseUrl, pageName) {
-  const jsCode = await fetchText(new URL(`files/${pageName}/data.js`, baseUrl).href);
+async function extractPageData(pageResourceBaseUrl, pageName) {
+  const jsCode = await fetchText(new URL('data.js', pageResourceBaseUrl).href);
   const axure = evaluateAxureCode(jsCode);
   if (!axure.page) throw new Error(`解析 ${pageName}/data.js 失败: page 为空`);
+  const currentPage = axure.page.page || axure.page;
 
   const imageRegex = /"images\/[^/]+\/[^,]+."/gi;
   const images = (jsCode.match(imageRegex) || [])
@@ -153,15 +162,15 @@ async function extractPageData(baseUrl, pageName) {
     .filter((img) => !/\.(png|jpg|jpeg|gif|svg|webp)-/.test(img));
 
   return {
-    pageId: axure.page.packageId,
+    pageId: currentPage.packageId,
     pageName,
-    diagram: axure.page.diagram,
-    interactionMap: axure.page.interactionMap,
-    pageNotes: axure.page.notes,
-    widgetNotes: axure.page.annotations,
-    objectPaths: axure.objectPaths,
-    generationDate: axure.generationDate,
-    url: axure.url,
+    diagram: currentPage.diagram,
+    interactionMap: currentPage.interactionMap,
+    pageNotes: currentPage.notes,
+    widgetNotes: currentPage.annotations,
+    objectPaths: axure.objectPaths || axure.page.objectPaths,
+    generationDate: axure.generationDate || axure.page.generationDate,
+    url: axure.url || axure.page.url,
     jsImages: images,
   };
 }
@@ -203,13 +212,13 @@ function extractNotes(pageData) {
 /**
  * 下载 Axure 页面引用的图片资源
  */
-async function downloadImages(baseUrl, pageName, images, outputDir) {
+async function downloadImages(pageResourceBaseUrl, images, outputDir) {
   const imagesDir = path.join(outputDir, 'images');
   fs.mkdirSync(imagesDir, { recursive: true });
   let downloaded = 0;
   for (const imgPath of images) {
     try {
-      const imgUrl = new URL(`files/${pageName}/${imgPath}`, baseUrl).href;
+      const imgUrl = new URL(imgPath, pageResourceBaseUrl).href;
       const res = await fetch(imgUrl);
       if (!res.ok) continue;
       const buffer = Buffer.from(await res.arrayBuffer());
@@ -247,17 +256,36 @@ async function closeBrowser() {
   if (_browser) { await _browser.close().catch(() => {}); _browser = null; }
 }
 
-async function captureScreenshot(playwright, baseUrl, pageName, outputPath, options = {}) {
+async function openRenderedPage(playwright, baseUrl, pageName, options = {}) {
   const browser = await getBrowser(playwright, options);
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
+  const pageUrl = buildPageUrl(baseUrl, pageName, options.routeContext);
+  await page.goto(pageUrl, { waitUntil: 'networkidle', timeout: 30000 });
+  const mainFrame = page.frame('mainFrame');
+  if (mainFrame) {
+    await mainFrame.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(1000);
+  }
+  return { context, page, mainFrame, target: mainFrame || page };
+}
+
+async function resolveRenderedPageResourceBaseUrl(playwright, baseUrl, pageName, options = {}) {
+  const { context, page, mainFrame } = await openRenderedPage(playwright, baseUrl, pageName, options);
   try {
-    const pageUrl = pageName ? `${baseUrl}start.html#p=${pageName}` : baseUrl;
-    await page.goto(pageUrl, { waitUntil: 'networkidle', timeout: 30000 });
-    const mainFrame = page.frame('mainFrame');
+    const fallbackBaseUrl = buildDefaultPageResourceBaseUrl(baseUrl, pageName);
+    return resolvePageResourceBaseUrl(
+      mainFrame?.url() || page.url(),
+      fallbackBaseUrl,
+      options.routeContext,
+    );
+  } finally { await context.close(); }
+}
+
+async function captureScreenshot(playwright, baseUrl, pageName, outputPath, options = {}) {
+  const { context, page, mainFrame } = await openRenderedPage(playwright, baseUrl, pageName, options);
+  try {
     if (mainFrame) {
-      await mainFrame.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(1500);
       const el = await page.$('#mainFrame');
       if (el) { await el.screenshot({ path: outputPath, type: 'png' }); return outputPath; }
     }
@@ -267,16 +295,8 @@ async function captureScreenshot(playwright, baseUrl, pageName, outputPath, opti
 }
 
 async function extractThemeTokens(playwright, baseUrl, pageName, options = {}) {
-  const browser = await getBrowser(playwright, options);
-  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-  const page = await context.newPage();
+  const { context, target } = await openRenderedPage(playwright, baseUrl, pageName, options);
   try {
-    const pageUrl = pageName ? `${baseUrl}start.html#p=${pageName}` : baseUrl;
-    await page.goto(pageUrl, { waitUntil: 'networkidle', timeout: 30000 });
-    const mainFrame = page.frame('mainFrame');
-    const target = mainFrame || page;
-    if (mainFrame) { await mainFrame.waitForLoadState('domcontentloaded'); await page.waitForTimeout(1000); }
-
     return await target.evaluate(() => {
       const bucket = () => new Map();
       const add = (b, v, t) => { if (!v) return; if (!b.has(v)) b.set(v, { count: 0, tags: new Set() }); const i = b.get(v); i.count++; if (t) i.tags.add(t); };
@@ -318,16 +338,9 @@ async function extractThemeTokens(playwright, baseUrl, pageName, options = {}) {
 }
 
 async function extractMarkdown(playwright, baseUrl, pageName, options = {}) {
-  const browser = await getBrowser(playwright, options);
-  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-  const page = await context.newPage();
+  const { context, page, mainFrame } = await openRenderedPage(playwright, baseUrl, pageName, options);
   try {
-    const pageUrl = pageName ? `${baseUrl}start.html#p=${pageName}` : baseUrl;
-    await page.goto(pageUrl, { waitUntil: 'networkidle', timeout: 30000 });
-    const mainFrame = page.frame('mainFrame');
     if (!mainFrame) return await page.evaluate(() => document.body?.innerText || '');
-    await mainFrame.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1000);
 
     return await mainFrame.evaluate(() => {
       function toMd(el) {
@@ -430,21 +443,12 @@ Axure 原型数据提取工具
 `);
 }
 
-function normalizeBaseUrl(url) {
-  try {
-    const u = new URL(url);
-    if (u.pathname.endsWith('.html')) u.pathname = u.pathname.replace(/\/[^/]+\.html$/, '/');
-    if (!u.pathname.endsWith('/')) u.pathname += '/';
-    u.hash = '';
-    return u.href;
-  } catch { return url.endsWith('/') ? url : url + '/'; }
-}
-
 async function main() {
   const args = parseArgs(process.argv);
   if (args.help) { showHelp(); process.exit(0); }
   if (!args.url) { console.error('❌ 请提供 Axure 原型 URL'); showHelp(); process.exit(1); }
 
+  const routeContext = parseAxureRouteContext(args.url);
   const baseUrl = normalizeBaseUrl(args.url);
   const outputDir = path.resolve(args.output);
   const log = args.verbose ? console.log.bind(console) : () => {};
@@ -501,17 +505,18 @@ async function main() {
     fs.mkdirSync(pageDir, { recursive: true });
 
     console.log(`📖 ${pageName}`);
+    const pageOpts = { ...browserOpts, routeContext };
 
     // ── 截图 + 主题（默认） ──────────────────────────
     if (playwright) {
       if (args.screenshot) {
         try {
-          await captureScreenshot(playwright, baseUrl, pageName, path.join(pageDir, 'screenshot.png'), browserOpts);
+          await captureScreenshot(playwright, baseUrl, pageName, path.join(pageDir, 'screenshot.png'), pageOpts);
           console.log(`   ✅ 截图 → screenshot.png`);
         } catch (e) { console.error(`   ❌ 截图失败: ${e.message}`); }
       }
       try {
-        const tokens = await extractThemeTokens(playwright, baseUrl, pageName, browserOpts);
+        const tokens = await extractThemeTokens(playwright, baseUrl, pageName, pageOpts);
         fs.writeFileSync(path.join(pageDir, 'theme.json'), JSON.stringify(tokens, null, 2));
         console.log(`   ✅ 主题 → theme.json`);
       } catch (e) { console.error(`   ❌ 主题提取失败: ${e.message}`); }
@@ -521,8 +526,14 @@ async function main() {
 
     // ── 交互 + 标注 + 文本（--advanced） ─────────────
     if (args.advanced) {
+      let pageData = null;
+      let pageResourceBaseUrl = buildDefaultPageResourceBaseUrl(baseUrl, pageName);
       try {
-        const pageData = await extractPageData(baseUrl, pageName);
+        if (playwright) {
+          pageResourceBaseUrl = await resolveRenderedPageResourceBaseUrl(playwright, baseUrl, pageName, pageOpts);
+          log(`   ✅ 页面资源路径: ${pageResourceBaseUrl}`);
+        }
+        pageData = await extractPageData(pageResourceBaseUrl, pageName);
         fs.writeFileSync(path.join(pageDir, 'data.json'), JSON.stringify(pageData, null, 2));
         log(`   ✅ 页面数据 → data.json`);
 
@@ -540,14 +551,14 @@ async function main() {
       // 下载引用的图片
       if (pageData?.jsImages?.length > 0) {
         try {
-          const count = await downloadImages(baseUrl, pageName, pageData.jsImages, pageDir);
+          const count = await downloadImages(pageResourceBaseUrl, pageData.jsImages, pageDir);
           if (count > 0) console.log(`   ✅ 图片 → images/ (${count} 个)`);
         } catch (e) { console.error(`   ❌ 图片下载失败: ${e.message}`); }
       }
 
       if (playwright) {
         try {
-          const md = await extractMarkdown(playwright, baseUrl, pageName, browserOpts);
+          const md = await extractMarkdown(playwright, baseUrl, pageName, pageOpts);
           if (md) {
             fs.writeFileSync(path.join(pageDir, 'content.md'), md);
             console.log(`   ✅ 文本 → content.md (${md.length} 字符)`);

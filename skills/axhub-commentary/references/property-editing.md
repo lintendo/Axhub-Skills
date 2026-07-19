@@ -15,7 +15,7 @@
 - 要以“给用户惊喜”为目标，充分发挥前端和 AI 的能力，但不要为了炫技牺牲可读性和可维护性
 - 宿主负责业务字段、默认值和更新语义
 - 编辑器只消费 `schema / values / update` 结果，不替宿主决定业务字段
-- 不要求安装编辑器 runtime；默认由 Axhub Chrome 扩展或 Make 预览环境提供编辑器
+- 不要求安装编辑器 runtime；默认由 Axhub Chrome 扩展或宿主预览环境提供编辑器
 
 需要快速确认字段类型和推荐场景时，读 `references/schema-guide.md`。
 

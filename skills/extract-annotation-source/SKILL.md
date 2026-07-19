@@ -13,6 +13,7 @@ Read Axhub prototype context from the runtime snapshot. Treat the page as read-o
 2. Wait until the app renders, then poll briefly for `window.__AXHUB_ANNOTATION_SOURCE__`.
 3. Evaluate and return that value. Do not modify the object or write anything back to `window`.
 4. If the value is missing, report the URL, page title, relevant console errors, and that the annotation runtime snapshot was not published.
+5. If the user asks to submit a review report back to Axhub Make, read `references/review-report-submission.md`.
 
 Minimal page evaluation:
 

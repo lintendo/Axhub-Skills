@@ -1,6 +1,6 @@
 ---
 name: extract-axure-data
-description: Extract structured data from Axure prototypes using Playwright — screenshots, design tokens, interaction maps, annotations, and page text. Use this skill whenever the user wants to extract data from an Axure prototype, reconstruct or clone an Axure page, analyze Axure design tokens, export Axure content, or work with Axure prototype URLs (even if they don't say "Axure" explicitly — look for AxShare links, /start.html#p= URLs, or mentions of wireframes/prototypes hosted online).
+description: Extract structured data from Axure prototypes using Playwright — screenshots, design tokens, interaction maps, annotations, and page text. Use this skill whenever the user wants to extract data from an Axure prototype, reconstruct or clone an Axure page, analyze Axure design tokens, export Axure content, or work with Axure prototype URLs (even if they don't say "Axure" explicitly — look for AxShare links, /start.html#p= URLs, /start.html?id=...&p=... URLs, or mentions of wireframes/prototypes hosted online).
 ---
 
 # Extract Axure Data
@@ -11,12 +11,12 @@ Extract structured data from Axure prototypes for page reconstruction, content a
 
 - User shares an Axure prototype URL and wants to extract or rebuild it
 - User asks to clone, reconstruct, or analyze a wireframe/prototype
-- User mentions AxShare, Axure Cloud, or prototype URLs with `start.html#p=`
+- User mentions AxShare, Axure Cloud, or prototype URLs with `start.html#p=` or `start.html?id=...&p=...`
 - User wants design tokens, screenshots, or interaction data from a prototype
 
 ## How it works
 
-Axure stores page data in static JS files (`data/document.js`, `files/{page}/data.js`). The script parses these directly in Node.js without needing a browser — this is fast and works for sitemap, interactions, and annotations. Screenshots and design tokens require rendering, so Playwright launches a Chromium instance for those.
+Axure stores page data in static JS files (`data/document.js`, `files/{page}/data.js`). The script parses these directly in Node.js without needing a browser — this is fast and works for sitemap, interactions, and annotations. Screenshots and design tokens require rendering, so Playwright launches a Chromium instance for those. For Axure preview URLs that route through `start.html?id=...&p=...`, the script first resolves the rendered frame URL so page data, screenshots, and text are extracted from the correct page resource directory.
 
 ## Quick start
 
