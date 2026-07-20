@@ -1,62 +1,106 @@
 ---
 name: axhub-commentary
-description: 处理 Axhub Commentary 完整工作流，包括读取页面批注文档、落实文案/样式/布局/交互修改、更新任务状态、清理已完成节点，以及接入调整面板属性、页面级聚合、多方案比稿和页面资源上下文。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、annotations.json、根据 Commentary 意见改代码、更新或清理批注任务、让页面“能在调整面板改”、方案切换或页面定位信息时使用。
+description: 处理 Axhub Commentary 完整工作流。首先启动并确认 ACP UI 可用，再生成可批注地址、读取页面批注文档、落实修改并更新或清理任务节点，也可配置 AI 侧边栏对话、AI 批注执行及其供应商 CLI，或按需接入调整面板属性、页面级聚合和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、需要可批注链接、annotations.json、根据 Commentary 意见改代码、更新或清理批注任务、唤醒或配置页面 AI、把批注交给 AI 执行、供应商安装登录、让页面“能在调整面板改”、方案切换或页面定位信息时使用。
 ---
 
 # Axhub Commentary 工作流
 
-覆盖两类相邻工作：一类是读取 Commentary 批注、落实代码修改并维护任务文档；另一类是补齐页面侧接入，让 Axhub Chrome 扩展或预览环境里的编辑器能识别、定位、读取可调整属性并回写。
+这个主文档只负责前置检查、工作线判断和读取顺序，细节放在对应的分文档里。技能不要求目标项目安装编辑器 runtime；编辑器由 Axhub Chrome 扩展或宿主预览环境提供。
 
-这个技能不负责安装编辑器 runtime。默认编辑器由 Axhub Chrome 扩展或宿主预览环境提供。页面侧只补必要的上下文声明和 tweak 协议；如果目标项目已经可用 `@axhub/commentary-react`，可以把它作为 React helper 使用，但不要把安装 NPM 包写成前置条件。
+## 0. 核心前置：ACP UI
+
+ACP UI 是 Commentary 的 AI 对话、AI 批注执行、provider session 和宿主资源工具的核心服务，也是本技能的第一项前置检查。纯本地的 tweak 读取回写、属性调整和页面内方案切换不直接依赖 ACP UI；但没有确认服务可用时，不得宣称 AI 能力已经就绪，也不要进入 AI 子流程。可批注地址仍按其分文档要求先完成服务检查。
+
+### 先检查服务
+
+访问 `http://localhost:32124/api/health`。响应同时满足下面两项，才算 ACP UI 已就绪：
+
+- `status` 为 `ok`
+- `service` 为 `acp-ui`
+
+端口已占用、存在相关进程或页面能打开，都不能代替健康检查。检查通过时直接复用现有服务，不要重复启动。
+
+### 服务不可用时启动
+
+ACP UI 必须在非沙箱环境中启动：
+
+```bash
+npx -y @axhub/acp@latest
+```
+
+- 能明确确认命令在非沙箱环境执行时，可以直接启动
+- 无法判断自己是否处于沙箱，或无法在沙箱外执行时，不要绕过限制；请用户在自己的终端手动运行启动命令
+- 不论由谁启动，都要重新执行健康检查；不能把“命令已经执行”当成“服务已经就绪”
+- 无法确认健康状态时，暂停依赖 ACP UI 的后续流程，明确告诉用户还缺哪一步；纯本地页面侧修改可继续，但交付时要说明 AI 能力未验证
+
+### 保持服务运行
+
+ACP UI 是持续依赖，不是执行完即退出的一次性命令。启动后保持进程运行，不要在任务完成时主动终止用户已有或本次启动的 ACP UI 服务。
+
+如果执行环境会在命令返回后回收进程，改用可保持运行的终端或会话；做不到时让用户在自己的终端启动。
+
+### 扩展来源授权
+
+本技能只处理 Chromium 内核浏览器扩展。Chrome、Edge、Brave、Arc、Opera 等浏览器的扩展页面都使用 `chrome-extension://`。只有浏览器工具或资源接口出现来源授权问题时，才读取当前扩展的真实 ID 并使用下面的启动方式：
+
+```bash
+ACP_UI_TRUSTED_HOST_ORIGINS=chrome-extension://<extension-id> \
+ACP_UI_CORS_ORIGINS=chrome-extension://<extension-id> \
+npx -y @axhub/acp@latest
+```
+
+Edge 商店版、Chrome 商店版和本地加载版的扩展 ID 可能不同。以当前扩展的 `chrome.runtime.id` 或扩展管理页显示的 ID 为准；替换后重启 ACP UI，再检查健康接口和目标功能。需要同时允许多个安装来源时，用英文逗号列出每个完整 origin，并在两个环境变量中保持一致。
+
+不要把来源环境变量作为默认启动方式，也不要使用 `ACP_UI_TRUSTED_HOST_ORIGINS=*`；可信来源必须是精确 origin。
 
 ## 工作分流
 
 先判断任务属于哪条工作线，只读取对应参考文件。
 
-### 1. 批注读取与处理
+### 1. 批注读取与处理（主要）
 
 任务涉及页面批注、改稿意见、批注图片、任务状态或已完成节点清理时，读 `references/comment-processing.md`。
 
-### 2. 页面侧接入
+### 2. 可批注地址与环境准备（主要）
 
-按目标继续分流：
+任务是生成可批注地址或确认页面定位时，读 `references/environment-context.md`。这里优先使用不改项目文件的临时链接方案；只有用户明确要求稳定入口时，才进入固定接入。
+
+### 3. AI 对话与批注执行（主要）
+
+任务涉及 AI 侧边栏对话、唤醒页面 AI、把批注交给 AI 执行、配置供应商，或排查供应商软件安装、终端可用性和登录授权时，读 `references/ai-capabilities.md`。供应商范围以 Commentary 当前两个入口实际开放的列表为准，不要直接照搬 ACP UI 后端的完整注册表。
+
+### 4. 页面侧接入（低频）
+
+只有用户明确要求修改页面接入能力时，才按目标读取对应分文档：
 
 - 调整面板属性、页面级属性聚合 → 读 `references/property-editing.md`
 - 多方案设计比稿、页面内方案切换 → 读 `references/design-bid.md`
-- 页面定位、实现文件和资源上下文 → 读 `references/environment-context.md`
+
+属性调整和多方案比稿都是低频、按需能力。这是修改页面代码的工作线；临时可批注链接不属于页面侧接入，不要为它修改页面文件或接入协议。
 
 批注要求新增接入能力时可以跨工作线：先读批注处理流程确定任务，再按具体目标补读一个页面侧接入参考。
 
-## 实施原则
+## 实施顺序
 
-### 批注读取与处理
-
-- 批注处理按 `references/comment-processing.md` 完成读取、任务认领、状态更新和节点清理；不要只改代码却把任务文档留在处理中
-- 有 Commentary 状态接口时优先通过接口更新；没有接口但任务要求维护持久化文档时，使用结构化 JSON 读写并做并发保护
-- 完成清理前先验证修改；失败或无法定位时保留批注并记录错误状态
-
-### 页面侧接入
-
-- tweak / schema / values / adapter / update / card 方案切换优先接入 `window.__AXHUB_COMMENTARY_TWEAK_PROTOCOL__`
-- React 宿主如果已经能使用 `@axhub/commentary-react`，优先用它的 store / adapter / hook 简化注册；否则直接实现同一套全局 tweak protocol
-- 页面资源上下文 / `filePath` / `targetPath` / `projectPath` 优先走页面声明 `window.__COMMENTARY_HOST__`；如果当前项目本来就手动初始化 Commentary runtime，再走 `createCommentary(...).host.getResourceContext()`
-- 术语对齐 `schema`、`values`、`adapter`、`update`
-- 页面环境信息优先提供最小必要的资源上下文，不堆临时调试噪音
-- 宿主负责业务字段、默认值和回写语义
-- 页面级属性聚合不是另造一套全局静态配置，而是基于元素级 tweak 注册结果做聚合展示
-- 如果当前环境支持子代理，可把独立实现拆出去；主代理保留整体约束与最终复核
+1. 先按上面的核心前置流程确认 ACP UI 健康，并保持服务运行。
+2. 优先判断任务是否属于主要流程 1、2 或 3；只有用户明确要求时才进入低频流程 4。
+3. 只读取命中流程的分文档，并按其中的完成条件执行。
+4. 批注处理必须完成状态更新与节点清理；临时地址默认不修改项目文件；页面侧接入完成后再验证回写能力。
 
 ## 交付要求
 
 最终回复按命中的子流程包含必要信息：
 
+- ACP UI：是否已确认健康；如果需要用户手动启动，给出准确命令和当前阻塞状态
 - 批注处理：完成了哪些界面修改、是否还有未处理或异常批注、做了哪些验证
+- AI 能力：目标入口和供应商、CLI 与登录是否就绪、两个入口分别验证到了哪一步；不要暴露 token 或其他凭据
 - 页面接入：修改了哪些文件、暴露了哪些属性或方案字段、做了哪些验证
 - 回复保持面向用户，不要把内部批注状态、同步细节或命令日志当作主要内容
 
 ## 参考
 
 - `references/comment-processing.md`
+- `references/ai-capabilities.md`
 - `references/property-editing.md`
 - `references/design-bid.md`
 - `references/environment-context.md`

@@ -2,6 +2,8 @@
 
 当用户要暴露 tweak / 调整面板字段、整理可编辑属性、补页面级属性聚合，或让某个元素“能在调整面板改”时，走这里。
 
+本文件专门承接微属性调整的实现细则。生成一次性的临时可批注链接、检查 ACP UI 或定位当前页面时，不走本流程，也不修改页面文件，改读 `references/environment-context.md`。
+
 ## 目标
 
 为目标元素或页面现有 tweak-capable 节点补齐可编辑的 `schema / values / adapter / update` 能力，让 Axhub Commentary 的调整面板能读取并回写这些属性。
