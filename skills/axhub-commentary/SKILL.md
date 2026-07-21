@@ -1,15 +1,15 @@
 ---
 name: axhub-commentary
-description: 处理 Axhub Commentary 完整工作流。首先启动并确认 ACP UI 可用，再生成可批注地址、读取页面批注文档、落实修改并更新或清理任务节点，也可配置 AI 侧边栏对话、AI 批注执行及其供应商 CLI，或按需接入调整面板属性、页面级聚合和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、需要可批注链接、annotations.json、根据 Commentary 意见改代码、更新或清理批注任务、唤醒或配置页面 AI、把批注交给 AI 执行、供应商安装登录、让页面“能在调整面板改”、方案切换或页面定位信息时使用。
+description: 处理 Axhub Commentary 完整工作流。首先启动并确认 ACP UI 可用，再生成可批注地址、读取页面批注文档、落实修改并更新或清理任务节点；也可为已接入 @axhub/annotation 的页面准备标注编辑环境，或配置 AI 侧边栏对话、AI 批注执行、调整面板属性和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、可批注链接、annotations.json、标注编辑按钮、修改标注内容、Annotation Runtime、annotationSourcePath、根据 Commentary 意见改代码、更新或清理批注任务、页面 AI、供应商安装登录、调整面板、方案切换或页面定位信息时使用。
 ---
 
 # Axhub Commentary 工作流
 
-这个主文档只负责前置检查、工作线判断和读取顺序，细节放在对应的分文档里。技能不要求目标项目安装编辑器 runtime；编辑器由 Axhub Chrome 扩展或宿主预览环境提供。
+先完成前置检查和工作线判断，再按任务读取对应的分文档。不要要求目标项目安装编辑器 runtime；编辑器由 Axhub Chrome 扩展或宿主预览环境提供。
 
 ## 0. 核心前置：ACP UI
 
-ACP UI 是 Commentary 的 AI 对话、AI 批注执行、provider session 和宿主资源工具的核心服务，也是本技能的第一项前置检查。纯本地的 tweak 读取回写、属性调整和页面内方案切换不直接依赖 ACP UI；但没有确认服务可用时，不得宣称 AI 能力已经就绪，也不要进入 AI 子流程。可批注地址仍按其分文档要求先完成服务检查。
+先确认 ACP UI 可用。Commentary 的 AI 对话、AI 批注执行、provider session、宿主资源工具和本地标注源读写都依赖该服务。纯本地的 tweak 读取回写、属性调整和页面内方案切换不直接依赖 ACP UI；未确认服务可用时，不得宣称 AI 能力或 AnnotationSource 编辑能力已经就绪。可批注地址和标注辅助仍按对应流程完成检查。
 
 ### 先检查服务
 
@@ -41,7 +41,7 @@ ACP UI 是持续依赖，不是执行完即退出的一次性命令。启动后�
 
 ### 扩展来源授权
 
-本技能只处理 Chromium 内核浏览器扩展。Chrome、Edge、Brave、Arc、Opera 等浏览器的扩展页面都使用 `chrome-extension://`。只有浏览器工具或资源接口出现来源授权问题时，才读取当前扩展的真实 ID 并使用下面的启动方式：
+只处理 Chromium 内核浏览器扩展。Chrome、Edge、Brave、Arc、Opera 等浏览器的扩展页面都使用 `chrome-extension://`。只有浏览器工具或资源接口出现来源授权问题时，才读取当前扩展的真实 ID 并使用下面的启动方式：
 
 ```bash
 ACP_UI_TRUSTED_HOST_ORIGINS=chrome-extension://<extension-id> \
@@ -65,25 +65,32 @@ Edge 商店版、Chrome 商店版和本地加载版的扩展 ID 可能不同。�
 
 任务是生成可批注地址或确认页面定位时，读 `references/environment-context.md`。这里优先使用不改项目文件的临时链接方案；只有用户明确要求稳定入口时，才进入固定接入。
 
-### 3. AI 对话与批注执行（主要）
+### 3. Annotation 标注环境准备（主要）
+
+用户需要 Annotation 能力时，按目标处理：
+
+1. 需要开启 Annotation Runtime：读 [axhub-annotation-standalone](https://github.com/lintendo/Axhub-Skills/blob/main/skills/axhub-annotation-standalone/SKILL.md) 完成页面接入。
+2. 需要让扩展修改标注内容：确保页面使用可编辑的标注源。外部 JSON 放在当前 `filePath` 同目录并命名为 `annotation-source.json`；单 HTML 页面把标注源内嵌在当前 HTML，并让 `annotationSourcePath` 指向该文件。通过页面上下文提供 `projectPath`、`filePath` 和必要的 `annotationSourcePath`，生成并打开可批注地址交给用户。只有标注源不符合上述两种约定时，才读 `references/environment-context.md` 处理自定义路径。
+
+### 4. AI 对话与批注执行（主要）
 
 任务涉及 AI 侧边栏对话、唤醒页面 AI、把批注交给 AI 执行、配置供应商，或排查供应商软件安装、终端可用性和登录授权时，读 `references/ai-capabilities.md`。供应商范围以 Commentary 当前两个入口实际开放的列表为准，不要直接照搬 ACP UI 后端的完整注册表。
 
-### 4. 页面侧接入（低频）
+### 5. 页面侧接入（低频）
 
 只有用户明确要求修改页面接入能力时，才按目标读取对应分文档：
 
 - 调整面板属性、页面级属性聚合 → 读 `references/property-editing.md`
 - 多方案设计比稿、页面内方案切换 → 读 `references/design-bid.md`
 
-属性调整和多方案比稿都是低频、按需能力。这是修改页面代码的工作线；临时可批注链接不属于页面侧接入，不要为它修改页面文件或接入协议。
+属性调整和多方案比稿都是低频、按需能力。这是修改页面代码的工作线；临时可批注链接和已有 Runtime 的标注内容编辑不属于页面侧接入，不要为它们修改业务页面实现。
 
 批注要求新增接入能力时可以跨工作线：先读批注处理流程确定任务，再按具体目标补读一个页面侧接入参考。
 
 ## 实施顺序
 
 1. 先按上面的核心前置流程确认 ACP UI 健康，并保持服务运行。
-2. 优先判断任务是否属于主要流程 1、2 或 3；只有用户明确要求时才进入低频流程 4。
+2. 优先判断任务是否属于主要流程 1、2、3 或 4；只有用户明确要求时才进入低频流程 5。
 3. 只读取命中流程的分文档，并按其中的完成条件执行。
 4. 批注处理必须完成状态更新与节点清理；临时地址默认不修改项目文件；页面侧接入完成后再验证回写能力。
 
@@ -93,6 +100,7 @@ Edge 商店版、Chrome 商店版和本地加载版的扩展 ID 可能不同。�
 
 - ACP UI：是否已确认健康；如果需要用户手动启动，给出准确命令和当前阻塞状态
 - 批注处理：完成了哪些界面修改、是否还有未处理或异常批注、做了哪些验证
+- 标注环境：可批注地址、采用的标注源形式和实际路径；未完成时说明缺少 Runtime 接入还是页面上下文
 - AI 能力：目标入口和供应商、CLI 与登录是否就绪、两个入口分别验证到了哪一步；不要暴露 token 或其他凭据
 - 页面接入：修改了哪些文件、暴露了哪些属性或方案字段、做了哪些验证
 - 回复保持面向用户，不要把内部批注状态、同步细节或命令日志当作主要内容
