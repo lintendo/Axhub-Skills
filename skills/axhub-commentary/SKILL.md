@@ -1,57 +1,20 @@
 ---
 name: axhub-commentary
-description: 处理 Axhub Commentary 完整工作流。首先启动并确认 ACP UI 可用，再生成可批注地址、读取页面批注文档、落实修改并更新或清理任务节点；也可为已接入 @axhub/annotation 的页面准备标注编辑环境，或配置 AI 侧边栏对话、AI 批注执行、调整面板属性和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、可批注链接、annotations.json、标注编辑按钮、修改标注内容、Annotation Runtime、annotationSourcePath、根据 Commentary 意见改代码、更新或清理批注任务、页面 AI、供应商安装登录、调整面板、方案切换或页面定位信息时使用。
+description: 处理 Axhub Commentary 完整工作流。首先检测并确认 ACP UI 可用，再生成可批注地址、读取页面批注文档、落实修改并更新批注状态，或在用户确认后写入删除标记；也可为已接入 @axhub/annotation 的页面准备标注编辑环境，或配置 AI 侧边栏对话、AI 批注执行、调整面板属性和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、可批注链接、comments.json、标注编辑按钮、修改标注内容、Annotation Runtime、annotationSourcePath、根据 Commentary 意见改代码、更新或清理批注、页面 AI、供应商安装登录、调整面板、方案切换或页面定位信息时使用。
 ---
 
 # Axhub Commentary 工作流
 
 先完成前置检查和工作线判断，再按任务读取对应的分文档。不要要求目标项目安装编辑器 runtime；编辑器由 Axhub Chrome 扩展或宿主预览环境提供。
 
-## 0. 核心前置：ACP UI
+## 0. 核心前置：检测 ACP UI
 
-先确认 ACP UI 可用。Commentary 的 AI 对话、AI 批注执行、provider session、宿主资源工具和本地标注源读写都依赖该服务。纯本地的 tweak 读取回写、属性调整和页面内方案切换不直接依赖 ACP UI；未确认服务可用时，不得宣称 AI 能力或 AnnotationSource 编辑能力已经就绪。可批注地址和标注辅助仍按对应流程完成检查。
+先访问 `http://localhost:32124/api/health`。只有响应同时满足 `status: "ok"` 和 `service: "acp-ui"`，才算 ACP UI 已就绪。端口占用、页面可打开或存在相关进程都不能代替该检测。
 
-### 先检查服务
+- 检测通过：直接继续工作流，不要启动 ACP UI。除非用户主动要求安装、注册或诊断 Native Host，否则不要读取启动文档。
+- 检测失败：此时才读取 `references/acp-native-bootstrap.md`，按原有非沙箱规则先启动并再次确认 health。Native Host 是后续可选能力，只有用户明确确认或主动要求安装时才注册。
 
-访问 `http://localhost:32124/api/health`。响应同时满足下面两项，才算 ACP UI 已就绪：
-
-- `status` 为 `ok`
-- `service` 为 `acp-ui`
-
-端口已占用、存在相关进程或页面能打开，都不能代替健康检查。检查通过时直接复用现有服务，不要重复启动。
-
-### 服务不可用时启动
-
-ACP UI 必须在非沙箱环境中启动：
-
-```bash
-npx -y @axhub/acp@latest
-```
-
-- 能明确确认命令在非沙箱环境执行时，可以直接启动
-- 无法判断自己是否处于沙箱，或无法在沙箱外执行时，不要绕过限制；请用户在自己的终端手动运行启动命令
-- 不论由谁启动，都要重新执行健康检查；不能把“命令已经执行”当成“服务已经就绪”
-- 无法确认健康状态时，暂停依赖 ACP UI 的后续流程，明确告诉用户还缺哪一步；纯本地页面侧修改可继续，但交付时要说明 AI 能力未验证
-
-### 保持服务运行
-
-ACP UI 是持续依赖，不是执行完即退出的一次性命令。启动后保持进程运行，不要在任务完成时主动终止用户已有或本次启动的 ACP UI 服务。
-
-如果执行环境会在命令返回后回收进程，改用可保持运行的终端或会话；做不到时让用户在自己的终端启动。
-
-### 扩展来源授权
-
-只处理 Chromium 内核浏览器扩展。Chrome、Edge、Brave、Arc、Opera 等浏览器的扩展页面都使用 `chrome-extension://`。只有浏览器工具或资源接口出现来源授权问题时，才读取当前扩展的真实 ID 并使用下面的启动方式：
-
-```bash
-ACP_UI_TRUSTED_HOST_ORIGINS=chrome-extension://<extension-id> \
-ACP_UI_CORS_ORIGINS=chrome-extension://<extension-id> \
-npx -y @axhub/acp@latest
-```
-
-Edge 商店版、Chrome 商店版和本地加载版的扩展 ID 可能不同。以当前扩展的 `chrome.runtime.id` 或扩展管理页显示的 ID 为准；替换后重启 ACP UI，再检查健康接口和目标功能。需要同时允许多个安装来源时，用英文逗号列出每个完整 origin，并在两个环境变量中保持一致。
-
-不要把来源环境变量作为默认启动方式，也不要使用 `ACP_UI_TRUSTED_HOST_ORIGINS=*`；可信来源必须是精确 origin。
+Commentary 的 AI 对话、AI 批注执行、provider session、宿主资源工具和本地标注源读写依赖 ACP UI；未确认 health 时，不得宣称这些能力就绪。纯本地 tweak 读取回写、属性调整和页面内方案切换可继续。
 
 ## 工作分流
 
@@ -59,7 +22,7 @@ Edge 商店版、Chrome 商店版和本地加载版的扩展 ID 可能不同。�
 
 ### 1. 批注读取与处理（主要）
 
-任务涉及页面批注、改稿意见、批注图片、任务状态或已完成节点清理时，读 `references/comment-processing.md`。
+任务涉及页面批注、改稿意见、批注图片、批注状态或显式删除批注节点时，读 `references/comment-processing.md`。
 
 ### 2. 可批注地址与环境准备（主要）
 
@@ -74,7 +37,7 @@ Edge 商店版、Chrome 商店版和本地加载版的扩展 ID 可能不同。�
 
 ### 4. AI 对话与批注执行（主要）
 
-任务涉及 AI 侧边栏对话、唤醒页面 AI、把批注交给 AI 执行、配置供应商，或排查供应商软件安装、终端可用性和登录授权时，读 `references/ai-capabilities.md`。供应商范围以 Commentary 当前两个入口实际开放的列表为准，不要直接照搬 ACP UI 后端的完整注册表。
+任务涉及 AI 侧边栏对话、唤醒页面 AI、把批注交给 AI 执行、配置供应商，或排查供应商软件安装、终端可用性和登录授权时，读 `references/ai-capabilities.md`。供应商和默认项以 ACP UI 当前配置为准，不在 Skill 中维护静态名单。
 
 ### 5. 页面侧接入（低频）
 
@@ -89,19 +52,19 @@ Edge 商店版、Chrome 商店版和本地加载版的扩展 ID 可能不同。�
 
 ## 实施顺序
 
-1. 先按上面的核心前置流程确认 ACP UI 健康，并保持服务运行。
+1. 先按上面的核心前置流程检测 ACP UI；只有检测失败时才读取 `references/acp-native-bootstrap.md`，不要提前加载启动细节。
 2. 优先判断任务是否属于主要流程 1、2、3 或 4；只有用户明确要求时才进入低频流程 5。
 3. 只读取命中流程的分文档，并按其中的完成条件执行。
-4. 批注处理必须完成状态更新与节点清理；临时地址默认不修改项目文件；页面侧接入完成后再验证回写能力。
+4. 批注处理成功后先写入 `completed` 并保留节点，再询问用户是否清除；用户确认后只写入删除标记，实际清理由扩展统一执行。临时地址默认不修改项目文件；页面侧接入完成后再验证回写能力。
 
 ## 交付要求
 
 最终回复按命中的子流程包含必要信息：
 
 - ACP UI：是否已确认健康；如果需要用户手动启动，给出准确命令和当前阻塞状态
-- 批注处理：完成了哪些界面修改、是否还有未处理或异常批注、做了哪些验证
+- 批注处理：完成了哪些界面修改、是否还有未处理或异常批注、做了哪些验证；写入 `completed` 后询问用户是否清除
 - 标注环境：可批注地址、采用的标注源形式和实际路径；未完成时说明缺少 Runtime 接入还是页面上下文
-- AI 能力：目标入口和供应商、CLI 与登录是否就绪、两个入口分别验证到了哪一步；不要暴露 token 或其他凭据
+- AI 能力：所选供应商、CLI 与登录是否就绪、provider session 是否可用；不要暴露 token 或其他凭据
 - 页面接入：修改了哪些文件、暴露了哪些属性或方案字段、做了哪些验证
 - 回复保持面向用户，不要把内部批注状态、同步细节或命令日志当作主要内容
 
@@ -112,3 +75,4 @@ Edge 商店版、Chrome 商店版和本地加载版的扩展 ID 可能不同。�
 - `references/property-editing.md`
 - `references/design-bid.md`
 - `references/environment-context.md`
+- `references/acp-native-bootstrap.md`
