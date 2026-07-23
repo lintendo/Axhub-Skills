@@ -7,7 +7,7 @@
 ## 启动流程
 
 1. 如果用户刚刚从扩展主动发起 AI/Commentary 启动，并且 Native Host 已经注册，可以复用现有 hook。扩展仍会先检测 health，只有不可用时才发送 Native Message。
-2. 其他情况默认先直接启动 ACP UI，不要为了完成本次启动而先安装 Native Host。能明确确认 AI 的终端处于非沙箱且会保留后台进程时，执行 `node "<skill-dir>/scripts/start-acp-ui.mjs"`；脚本会再次检测 health，并只在不可用时启动固定 NPX 命令。
+2. 其他情况默认先直接启动 ACP UI，不要为了完成本次启动而先安装 Native Host。能明确确认 AI 的终端处于非沙箱且会保留后台进程时，执行 `node "<skill-dir>/scripts/start-acp-ui.mjs"`；脚本会再次检测 health，并与 Native Host 共用原子启动租约，只允许一个进程在服务不可用时启动固定 NPX 命令。
 3. 无法确认非沙箱环境、无法在沙箱外执行，或执行环境会回收后台进程时，不要绕过限制；引导用户在自己的终端运行下方 NPX 命令。
 4. 不论由扩展、AI 还是用户启动，都继续轮询 `http://localhost:32124/api/health`。只有响应同时满足 `status: "ok"` 和 `service: "acp-ui"`，才能返回主工作流；Native Message 已接受或 NPX 已执行都不能代替 health。
 5. health 超时或协议错误时停止依赖 ACP UI 的流程，明确说明还缺少的步骤并按下方诊断；纯本地页面修改可以继续，但交付时说明 AI 能力未验证。
@@ -20,26 +20,22 @@ npx -y @axhub/acp@latest
 
 ACP UI 是持续依赖，不是执行完即退出的一次性命令。启动后保持进程运行，不要在任务完成时主动终止用户已有或本次启动的 ACP UI 服务。如果 AI 的执行环境会回收进程，改用可保持运行的非沙箱终端或会话；做不到时让用户在自己的终端启动。
 
-只有直接 fallback 需要授权当前扩展来源时，才传入真实扩展 ID：
+ACP 自带默认来源列表，正式发行扩展已经包含在默认列表时不要传扩展 ID，也不要重复配置来源。只有本地加载版或其他特殊安装的真实扩展 ID 确实需要加入 ACP 运行时 trusted-host 列表时，才传入：
 
 ```bash
 AXHUB_EXTENSION_ID=<extension-id> \
 node "<skill-dir>/scripts/start-acp-ui.mjs"
 ```
 
-脚本只接受 32 位 Chromium 扩展 ID，并转换为精确 origin；不要设置 wildcard。
-
-只处理 Chromium 内核浏览器扩展。Chrome、Edge、Brave、Arc、Opera 等浏览器的扩展页面都使用 `chrome-extension://`。只有浏览器工具或资源接口出现来源授权问题时，才读取当前扩展的真实 ID 并使用下面的直接启动方式：
+脚本只接受 32 位 Chromium 扩展 ID，并转换为精确 origin；不要设置 wildcard。启动时不写入 `ACP_UI_CORS_ORIGINS` 或 `ACP_UI_TRUSTED_HOST_ORIGINS`，始终保留 `@axhub/acp` 自己的默认来源列表。health 就绪后，脚本通过 ACP 官方命令执行进程内追加：
 
 ```bash
-ACP_UI_TRUSTED_HOST_ORIGINS=chrome-extension://<extension-id> \
-ACP_UI_CORS_ORIGINS=chrome-extension://<extension-id> \
-npx -y @axhub/acp@latest
+npx -y @axhub/acp@latest trusted-host add chrome-extension://<extension-id>
 ```
 
-Chrome 正式版默认使用扩展 ID `cndglokmgjecikflojjieeeajbljgfae`，Edge 正式版默认使用 `ahkknhkjionomkpjfiinnbjbdghccigm`。根据当前浏览器直接使用对应默认 ID；只有默认 ID 授权失败、用户明确使用本地加载版或其他安装来源时，才引导用户打开当前浏览器的扩展管理页并复制该安装实际显示的 ID，不要猜测或沿用其他浏览器的 ID。替换后重启 ACP UI，再检查 health 和目标功能。需要同时允许多个安装来源时，用英文逗号列出每个完整 origin，并在两个环境变量中保持一致。
+这个命令只追加 trusted host，不追加 CORS，不修改 ACP 的启动默认值。ACP 当前版本没有运行时追加 CORS 的公开入口；非默认扩展 origin 如果还需要直接访问资源 API，必须先由 ACP 提供追加式 CORS 能力，Skill 不得通过设置 `ACP_UI_CORS_ORIGINS` 覆盖整份默认列表。
 
-不要把来源环境变量作为默认启动方式，也不要使用 `ACP_UI_TRUSTED_HOST_ORIGINS=*` 或 `ACP_UI_CORS_ORIGINS=*`；可信来源必须是精确 origin。
+只处理 Chromium 内核浏览器扩展。Chrome、Edge、Brave、Arc、Opera 等浏览器的扩展页面都使用 `chrome-extension://`。非默认安装先从扩展管理页读取真实 ID，不要猜测或沿用其他浏览器的 ID。
 
 ## 可选推荐：Native Host
 
@@ -71,7 +67,9 @@ node "<skill-dir>/scripts/doctor.mjs" --json --browser edge --extension-id ahkkn
 
 注册脚本按平台生成 `run_host.sh` 或 `run_host.bat`，写入 `node_path.txt`、用户级 manifest 和 Windows HKCU registry。重复注册会合并真实扩展 origin；禁止 wildcard。注册始终是显式用户级操作，不自动触发 sudo/UAC。
 
-Native host 只创建 `npx -y @axhub/acp@latest` 进程。它不检查 health，不运行 Skill，不执行注册、权限修复或脚本注入。页面 Runtime 或启动脚本的注入只由 Skill/AI 负责；ACP UI 和 Native host 都不得向扩展注入脚本。
+Native host 收到请求后会自行再次检测 health；服务健康时直接复用，服务不可用时与直接 fallback 共用用户目录下的原子启动租约。只有租约持有者可以创建不带 CORS/Trusted Host 覆盖参数的 `npx -y @axhub/acp@latest` 进程，其他请求等待同一 health 结果，不得重复启动。health 就绪后，Native host 另起轻量 worker 执行官方 `trusted-host add`，仅追加当前精确 origin。它不运行 Skill，不执行注册、权限修复或脚本注入，也不修改 ACP 默认 CORS 列表。页面 Runtime 或启动脚本的注入只由 Skill/AI 负责；ACP UI 和 Native host 都不得向扩展注入脚本。
+
+注册后的运行日志位于 `~/.axhub/acp-native-host/logs/`（Windows 为 `%LOCALAPPDATA%\Axhub\acp-native-host\logs\`）：`wrapper.log` 记录浏览器调用 wrapper，`native-host.log` 记录结构化协议与启动事件，`acp-ui.log` 记录 NPX/ACP UI 子进程输出。Native Messaging stdout 始终只写长度前缀帧，不写诊断文本；排障时优先检查这些文件和 doctor 的 `host.logs` 项。
 
 ## Doctor
 

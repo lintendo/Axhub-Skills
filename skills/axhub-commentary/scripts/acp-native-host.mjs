@@ -9,9 +9,21 @@ import { fileURLToPath } from "node:url";
 
 export const MAX_NATIVE_MESSAGE_BYTES = 1024 * 1024;
 export const ACP_START_ARGS = ["-y", "@axhub/acp@latest"];
+export const ACP_TRUSTED_HOST_ARGS = [
+  "-y",
+  "@axhub/acp@latest",
+  "trusted-host",
+  "add",
+];
 export const HOST_LOG_FILE_NAME = "native-host.log";
 export const ACP_UI_LOG_FILE_NAME = "acp-ui.log";
 const DEFAULT_MAX_LOG_BYTES = 2 * 1024 * 1024;
+export const ACP_HEALTH_URL = "http://127.0.0.1:32124/api/health";
+export const ACP_LAUNCH_LEASE_DIR_NAME = "acp-ui-start.lock";
+export const ACP_LAUNCH_LEASE_TTL_MS = 120_000;
+export const ACP_STARTUP_TIMEOUT_MS = 30_000;
+const TRUSTED_HOST_GRANT_MODE = "--grant-trusted-host";
+const TRUSTED_HOST_GRANT_TIMEOUT_MS = 90_000;
 
 export class AcpLaunchError extends Error {
   constructor(code, message) {
@@ -175,17 +187,10 @@ function extensionOriginOf(message) {
 }
 
 export function buildAcpEnvironment(
-  extensionOrigin,
+  _extensionOrigin,
   baseEnvironment = process.env,
 ) {
-  const environment = { ...baseEnvironment };
-  delete environment.ACP_UI_TRUSTED_HOST_ORIGINS;
-  delete environment.ACP_UI_CORS_ORIGINS;
-  if (extensionOrigin) {
-    environment.ACP_UI_TRUSTED_HOST_ORIGINS = extensionOrigin;
-    environment.ACP_UI_CORS_ORIGINS = extensionOrigin;
-  }
-  return environment;
+  return { ...baseEnvironment };
 }
 
 export function buildNpxLaunch(platform, environment) {
@@ -196,6 +201,268 @@ export function buildNpxLaunch(platform, environment) {
     };
   }
   return { command: "npx", args: [...ACP_START_ARGS] };
+}
+
+export function buildTrustedHostLaunch(platform, environment, extensionOrigin) {
+  const args = [...ACP_TRUSTED_HOST_ARGS, extensionOrigin];
+  if (platform === "win32") {
+    return {
+      command: environment.ComSpec || environment.COMSPEC || "cmd.exe",
+      args: ["/d", "/s", "/c", "npx.cmd", ...args],
+    };
+  }
+  return { command: "npx", args };
+}
+
+function wait(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+export async function isAcpHealthy(
+  fetchImpl = fetch,
+  healthUrl = process.env.AXHUB_ACP_HEALTH_URL || ACP_HEALTH_URL,
+) {
+  try {
+    const response = await fetchImpl(healthUrl, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(1500),
+    });
+    const body = await response.json().catch(() => ({}));
+    return response.ok && body?.status === "ok" && body?.service === "acp-ui";
+  } catch {
+    return false;
+  }
+}
+
+export function resolveAcpLaunchLeasePath({
+  platform = process.platform,
+  homeDir = os.homedir(),
+  environment = process.env,
+} = {}) {
+  const hostDir =
+    platform === "win32"
+      ? path.join(
+          environment.LOCALAPPDATA || path.join(homeDir, "AppData", "Local"),
+          "Axhub",
+          "acp-native-host",
+        )
+      : path.join(homeDir, ".axhub", "acp-native-host");
+  return path.join(hostDir, ACP_LAUNCH_LEASE_DIR_NAME);
+}
+
+function readLeaseToken(leasePath) {
+  try {
+    const value = JSON.parse(
+      fs.readFileSync(path.join(leasePath, "owner.json"), "utf8"),
+    );
+    return typeof value?.token === "string" ? value.token : "";
+  } catch {
+    return "";
+  }
+}
+
+function removeStaleLease(leasePath, leaseTtlMs, now) {
+  let modifiedAt;
+  try {
+    modifiedAt = fs.statSync(leasePath).mtimeMs;
+  } catch {
+    return true;
+  }
+  if (now() - modifiedAt <= leaseTtlMs) return false;
+
+  const stalePath = `${leasePath}.stale-${process.pid}-${Math.random()
+    .toString(16)
+    .slice(2)}`;
+  try {
+    fs.renameSync(leasePath, stalePath);
+  } catch {
+    return false;
+  }
+  try {
+    fs.rmSync(stalePath, { recursive: true, force: true });
+  } catch {
+    // The renamed stale lease no longer blocks a new owner.
+  }
+  return true;
+}
+
+export function acquireAcpLaunchLease({
+  leasePath = resolveAcpLaunchLeasePath(),
+  leaseTtlMs = ACP_LAUNCH_LEASE_TTL_MS,
+  now = Date.now,
+} = {}) {
+  fs.mkdirSync(path.dirname(leasePath), { recursive: true });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const token = `${process.pid}-${now()}-${Math.random().toString(16).slice(2)}`;
+    let created = false;
+    try {
+      fs.mkdirSync(leasePath);
+      created = true;
+      fs.writeFileSync(
+        path.join(leasePath, "owner.json"),
+        `${JSON.stringify({ token, pid: process.pid, createdAt: now() })}\n`,
+        "utf8",
+      );
+      let released = false;
+      return {
+        leasePath,
+        release() {
+          if (released) return;
+          released = true;
+          if (readLeaseToken(leasePath) !== token) return;
+          fs.rmSync(leasePath, { recursive: true, force: true });
+        },
+      };
+    } catch (error) {
+      if (error?.code !== "EEXIST") {
+        try {
+          if (created || readLeaseToken(leasePath) === token) {
+            fs.rmSync(leasePath, { recursive: true, force: true });
+          }
+        } catch {
+          // Preserve the original lease acquisition error.
+        }
+        throw error;
+      }
+      if (!removeStaleLease(leasePath, leaseTtlMs, now)) return null;
+    }
+  }
+  return null;
+}
+
+export async function waitForAcpHealth({
+  fetchImpl = fetch,
+  healthUrl = process.env.AXHUB_ACP_HEALTH_URL || ACP_HEALTH_URL,
+  timeoutMs = ACP_STARTUP_TIMEOUT_MS,
+  retryDelayMs = 500,
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isAcpHealthy(fetchImpl, healthUrl)) return true;
+    await wait(Math.max(1, retryDelayMs));
+  }
+  return false;
+}
+
+export async function grantTrustedHostWhenReady(
+  extensionOrigin,
+  {
+    fetchImpl = fetch,
+    spawnProcess = spawn,
+    platform = process.platform,
+    homeDir = os.homedir(),
+    environment = process.env,
+    timeoutMs = TRUSTED_HOST_GRANT_TIMEOUT_MS,
+    retryDelayMs = 500,
+    logger = createFileLogger(),
+  } = {},
+) {
+  if (!isValidExtensionOrigin(extensionOrigin)) return false;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isAcpHealthy(fetchImpl)) {
+      await wait(retryDelayMs);
+      const launch = buildTrustedHostLaunch(
+        platform,
+        environment,
+        extensionOrigin,
+      );
+      logger?.write?.("trusted_host_append_requested", {
+        extensionOrigin,
+        command: launch.command,
+        args: launch.args,
+      });
+      return await new Promise((resolve) => {
+        let child;
+        try {
+          child = spawnProcess(launch.command, launch.args, {
+            cwd: homeDir,
+            env: { ...environment },
+            detached: false,
+            shell: false,
+            windowsHide: true,
+            stdio: "ignore",
+          });
+        } catch (error) {
+          logger?.write?.("trusted_host_append_failed", {
+            extensionOrigin,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          resolve(false);
+          return;
+        }
+        child.once("error", (error) => {
+          logger?.write?.("trusted_host_append_failed", {
+            extensionOrigin,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          resolve(false);
+        });
+        child.once("close", (code) => {
+          logger?.write?.(
+            code === 0
+              ? "trusted_host_append_succeeded"
+              : "trusted_host_append_failed",
+            { extensionOrigin, exitCode: code },
+          );
+          resolve(code === 0);
+        });
+      });
+    }
+    await wait(retryDelayMs);
+  }
+  logger?.write?.("trusted_host_append_timeout", { extensionOrigin, timeoutMs });
+  return false;
+}
+
+function spawnTrustedHostGrantWorker(
+  extensionOrigin,
+  {
+    spawnProcess,
+    homeDir,
+    environment,
+    logger,
+  },
+) {
+  if (!spawnProcess || !isValidExtensionOrigin(extensionOrigin)) return;
+  try {
+    const worker = spawnProcess(
+      process.execPath,
+      [fileURLToPath(import.meta.url), TRUSTED_HOST_GRANT_MODE, extensionOrigin],
+      {
+        cwd: homeDir,
+        env: {
+          ...environment,
+          ...(logger?.logDir
+            ? { AXHUB_ACP_NATIVE_LOG_DIR: logger.logDir }
+            : {}),
+        },
+        detached: true,
+        shell: false,
+        windowsHide: true,
+        stdio: "ignore",
+      },
+    );
+    worker.once("error", (error) => {
+      logger?.write?.("trusted_host_worker_failed", {
+        extensionOrigin,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
+    worker.once("spawn", () => {
+      logger?.write?.("trusted_host_worker_spawned", {
+        extensionOrigin,
+        workerPid: worker.pid ?? null,
+      });
+      worker.unref();
+    });
+  } catch (error) {
+    logger?.write?.("trusted_host_worker_failed", {
+      extensionOrigin,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 export function launchAcpUi(
@@ -287,6 +554,87 @@ export function launchAcpUi(
   });
 }
 
+export async function ensureAcpUiRunning(
+  extensionOrigin,
+  {
+    fetchImpl = fetch,
+    spawnProcess = spawn,
+    platform = process.platform,
+    homeDir = os.homedir(),
+    environment = process.env,
+    logger,
+    healthUrl = environment.AXHUB_ACP_HEALTH_URL || ACP_HEALTH_URL,
+    startupTimeoutMs = ACP_STARTUP_TIMEOUT_MS,
+    retryDelayMs = 500,
+    leasePath = resolveAcpLaunchLeasePath({ platform, homeDir, environment }),
+    leaseTtlMs = Math.max(
+      ACP_LAUNCH_LEASE_TTL_MS,
+      startupTimeoutMs + 30_000,
+    ),
+  } = {},
+) {
+  if (await isAcpHealthy(fetchImpl, healthUrl)) {
+    logger?.write?.("acp_already_healthy");
+    return { state: "already_healthy" };
+  }
+
+  const lease = acquireAcpLaunchLease({ leasePath, leaseTtlMs });
+  if (!lease) {
+    logger?.write?.("acp_launch_deduplicated", { leasePath });
+    const healthy = await waitForAcpHealth({
+      fetchImpl,
+      healthUrl,
+      timeoutMs: startupTimeoutMs,
+      retryDelayMs,
+    });
+    if (healthy) return { state: "startup_in_progress" };
+    throw new AcpLaunchError(
+      "ACP_START_TIMEOUT",
+      `ACP UI did not become healthy within ${startupTimeoutMs}ms`,
+    );
+  }
+
+  let keepLeaseUntilStale = false;
+  try {
+    // Close the race between the first health probe and atomic lease acquisition.
+    if (await isAcpHealthy(fetchImpl, healthUrl)) {
+      logger?.write?.("acp_became_healthy_before_launch");
+      return { state: "already_healthy" };
+    }
+    const launched = await launchAcpUi(extensionOrigin, {
+      spawnProcess,
+      platform,
+      homeDir,
+      environment,
+      logger,
+    });
+    const healthy = await waitForAcpHealth({
+      fetchImpl,
+      healthUrl,
+      timeoutMs: startupTimeoutMs,
+      retryDelayMs,
+    });
+    if (!healthy) {
+      // A successfully spawned process may still be booting. Keep the lease until
+      // its TTL expires so an automatic retry cannot immediately launch another.
+      keepLeaseUntilStale = true;
+      logger?.write?.("acp_startup_timeout", {
+        childPid: launched.pid ?? null,
+        startupTimeoutMs,
+        leasePath,
+      });
+      throw new AcpLaunchError(
+        "ACP_START_TIMEOUT",
+        `ACP UI did not become healthy within ${startupTimeoutMs}ms`,
+      );
+    }
+    logger?.write?.("acp_startup_ready", { childPid: launched.pid ?? null });
+    return { state: "started", ...launched };
+  } finally {
+    if (!keepLeaseUntilStale) lease.release();
+  }
+}
+
 export async function handleNativeMessage(message, options = {}) {
   if (message?.type !== "start_acp_ui") {
     return errorResponse(
@@ -325,12 +673,28 @@ export async function handleNativeMessage(message, options = {}) {
   const extensionOrigin = callerOrigin || payloadOrigin;
 
   try {
-    const result = await launchAcpUi(extensionOrigin, options);
+    const result = await ensureAcpUiRunning(extensionOrigin, options);
+    const launchSpawnProcess = options.spawnProcess || spawn;
+    spawnTrustedHostGrantWorker(extensionOrigin, {
+      spawnProcess:
+        options.spawnGrantWorker === undefined
+          ? launchSpawnProcess === spawn
+            ? spawn
+            : undefined
+          : options.spawnGrantWorker,
+      homeDir: options.homeDir || os.homedir(),
+      environment: options.environment || process.env,
+      logger: options.logger,
+    });
     const requestId = requestIdOf(message);
     return {
       type: "start_acp_ui_result",
       ...(requestId ? { responseToRequestId: requestId } : {}),
-      payload: { accepted: true, ...(result.pid ? { pid: result.pid } : {}) },
+      payload: {
+        accepted: true,
+        state: result.state,
+        ...(result.pid ? { pid: result.pid } : {}),
+      },
     };
   } catch (error) {
     return errorResponse(
@@ -425,4 +789,10 @@ const isDirectRun =
   process.argv[1] &&
   realFilePath(process.argv[1]) ===
     realFilePath(fileURLToPath(import.meta.url));
-if (isDirectRun) runNativeHost();
+if (isDirectRun) {
+  if (process.argv[2] === TRUSTED_HOST_GRANT_MODE) {
+    process.exitCode = (await grantTrustedHostWhenReady(process.argv[3])) ? 0 : 1;
+  } else {
+    runNativeHost();
+  }
+}

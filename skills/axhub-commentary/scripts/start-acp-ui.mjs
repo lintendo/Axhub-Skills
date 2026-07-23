@@ -5,81 +5,74 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import {
+  buildNpxLaunch,
+  buildTrustedHostLaunch,
+  ensureAcpUiRunning,
+} from './acp-native-host.mjs';
 
 const healthUrl = process.env.AXHUB_ACP_HEALTH_URL || 'http://localhost:32124/api/health';
 const startupTimeoutMs = Number(process.env.AXHUB_ACP_STARTUP_TIMEOUT_MS || 30_000);
 const retryDelayMs = Number(process.env.AXHUB_ACP_RETRY_DELAY_MS || 500);
-
-async function probeHealth() {
-  try {
-    const response = await fetch(healthUrl, { signal: AbortSignal.timeout(1500), cache: 'no-store' });
-    const body = await response.json().catch(() => ({}));
-    return response.ok && body?.status === 'ok' && body?.service === 'acp-ui';
-  } catch {
-    return false;
-  }
-}
 
 function exactOrigin() {
   const id = String(process.env.AXHUB_EXTENSION_ID || '').trim();
   return /^[a-p]{32}$/u.test(id) ? `chrome-extension://${id}` : '';
 }
 
-export function buildNpxLaunch(platform, environment) {
-  const args = ['-y', '@axhub/acp@latest'];
-  if (platform === 'win32') {
-    return {
-      command: environment.ComSpec || environment.COMSPEC || 'cmd.exe',
-      args: ['/d', '/s', '/c', 'npx.cmd', ...args],
-    };
-  }
-  return { command: 'npx', args };
-}
+export { buildNpxLaunch, buildTrustedHostLaunch };
 
-function startNpx() {
-  const launch = buildNpxLaunch(process.platform, process.env);
-  const origin = exactOrigin();
-  const env = { ...process.env };
-  delete env.ACP_UI_TRUSTED_HOST_ORIGINS;
-  delete env.ACP_UI_CORS_ORIGINS;
-  if (origin) {
-    env.ACP_UI_TRUSTED_HOST_ORIGINS = origin;
-    env.ACP_UI_CORS_ORIGINS = origin;
-  }
-  const child = spawn(launch.command, launch.args, {
-    cwd: process.env.HOME || process.env.USERPROFILE || process.cwd(),
-    detached: true,
-    shell: false,
-    windowsHide: true,
-    stdio: 'ignore',
-    env,
+function appendTrustedHost(origin) {
+  if (!origin) return Promise.resolve(true);
+  const launch = buildTrustedHostLaunch(process.platform, process.env, origin);
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(launch.command, launch.args, {
+        cwd: process.env.HOME || process.env.USERPROFILE || process.cwd(),
+        env: { ...process.env },
+        detached: false,
+        shell: false,
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+    } catch (error) {
+      process.stderr.write(`Failed to append ACP trusted host: ${error.message}\n`);
+      resolve(false);
+      return;
+    }
+    child.once('error', (error) => {
+      process.stderr.write(`Failed to append ACP trusted host: ${error.message}\n`);
+      resolve(false);
+    });
+    child.once('close', (code) => resolve(code === 0));
   });
-  child.on('error', (error) => {
-    process.stderr.write(`Failed to spawn ACP UI: ${error.message}\n`);
-  });
-  child.unref();
-  return child;
 }
 
 export async function main() {
-  if (await probeHealth()) {
-    process.stdout.write('ACP UI is already healthy; no start was requested.\n');
-    return 0;
-  }
-
-  const child = startNpx();
-  process.stdout.write(`Requested ACP UI start (pid=${child.pid ?? 'unknown'}); waiting for health.\n`);
-  const deadline = Date.now() + startupTimeoutMs;
-  while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-    if (await probeHealth()) {
-      process.stdout.write('ACP UI health is ready.\n');
-      return 0;
+  const origin = exactOrigin();
+  try {
+    const result = await ensureAcpUiRunning(origin, {
+      healthUrl,
+      startupTimeoutMs,
+      retryDelayMs,
+    });
+    if (!(await appendTrustedHost(origin))) {
+      process.stderr.write('ACP UI is healthy, but trusted host append failed.\n');
+      return 1;
     }
+    if (result.state === 'already_healthy') {
+      process.stdout.write('ACP UI is already healthy; no start was requested.\n');
+    } else if (result.state === 'startup_in_progress') {
+      process.stdout.write('ACP UI startup was already in progress; reused the existing request.\n');
+    } else {
+      process.stdout.write(`ACP UI started and health is ready (pid=${result.pid ?? 'unknown'}).\n`);
+    }
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
   }
-
-  process.stderr.write(`ACP UI did not become healthy within ${startupTimeoutMs}ms.\n`);
-  return 1;
 }
 
 function realFilePath(value) {

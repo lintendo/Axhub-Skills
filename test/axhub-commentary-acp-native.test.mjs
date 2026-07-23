@@ -10,8 +10,13 @@ import { fileURLToPath } from "node:url";
 
 import {
   ACP_START_ARGS,
+  ACP_TRUSTED_HOST_ARGS,
+  buildAcpEnvironment,
+  buildTrustedHostLaunch,
   createFileLogger,
   encodeNativeMessage,
+  ensureAcpUiRunning,
+  grantTrustedHostWhenReady,
   handleNativeMessage,
   isValidExtensionOrigin,
   readNativeMessages,
@@ -47,6 +52,23 @@ function fakeSpawn({ error } = {}) {
     return child;
   };
   return { calls, spawnProcess };
+}
+
+function healthResponse(healthy) {
+  return {
+    ok: healthy,
+    json: async () =>
+      healthy ? { status: "ok", service: "acp-ui" } : { status: "starting" },
+  };
+}
+
+function healthSequence(...states) {
+  let index = 0;
+  return async () => {
+    const state = states[Math.min(index, states.length - 1)] ?? false;
+    index += 1;
+    return healthResponse(state);
+  };
 }
 
 function doctorExec(command, args) {
@@ -162,7 +184,7 @@ test("rejects unknown messages and invalid origins without spawning", async () =
   assert.equal(invalid.payload.accepted, false);
 });
 
-test("binds ACP launch to Chromium's caller origin and rejects payload spoofing", async () => {
+test("binds ACP launch to Chromium's caller origin and rejects payload spoofing", async (t) => {
   const callerOrigin = `chrome-extension://${"a".repeat(32)}/`;
   const differentOrigin = `chrome-extension://${"b".repeat(32)}`;
   const spawnProcess = () => {
@@ -182,16 +204,22 @@ test("binds ACP launch to Chromium's caller origin and rejects payload spoofing"
   const launcher = fakeSpawn();
   const accepted = await handleNativeMessage(
     { type: "start_acp_ui" },
-    { callerOrigin, spawnProcess: launcher.spawnProcess },
+    {
+      callerOrigin,
+      spawnProcess: launcher.spawnProcess,
+      fetchImpl: healthSequence(false, false, true),
+      retryDelayMs: 1,
+      leasePath: path.join(temporaryDirectory(t), "launch.lock"),
+    },
   );
   assert.equal(accepted.payload.accepted, true);
   assert.equal(
-    launcher.calls[0].options.env.ACP_UI_TRUSTED_HOST_ORIGINS,
-    callerOrigin.slice(0, -1),
+    Object.hasOwn(launcher.calls[0].options.env, "ACP_UI_TRUSTED_HOST_ORIGINS"),
+    false,
   );
 });
 
-test("launches the fixed NPX command without a shell and returns its pid", async () => {
+test("launches ACP without replacing its CORS or trusted-host defaults", async (t) => {
   const origin = `chrome-extension://${"a".repeat(32)}`;
   const launcher = fakeSpawn();
   const response = await handleNativeMessage(
@@ -204,10 +232,10 @@ test("launches the fixed NPX command without a shell and returns its pid", async
       spawnProcess: launcher.spawnProcess,
       platform: "darwin",
       homeDir: "/tmp/home",
-      environment: {
-        ACP_UI_TRUSTED_HOST_ORIGINS: "*",
-        ACP_UI_CORS_ORIGINS: "*",
-      },
+      environment: { PATH: "/usr/bin" },
+      fetchImpl: healthSequence(false, false, true),
+      retryDelayMs: 1,
+      leasePath: path.join(temporaryDirectory(t), "launch.lock"),
     },
   );
 
@@ -218,11 +246,121 @@ test("launches the fixed NPX command without a shell and returns its pid", async
   assert.deepEqual(launcher.calls[0].args, ACP_START_ARGS);
   assert.equal(launcher.calls[0].options.shell, false);
   assert.equal(launcher.calls[0].options.detached, true);
+  assert.equal(Object.hasOwn(launcher.calls[0].options.env, "ACP_UI_CORS_ORIGINS"), false);
   assert.equal(
-    launcher.calls[0].options.env.ACP_UI_TRUSTED_HOST_ORIGINS,
-    origin,
+    Object.hasOwn(launcher.calls[0].options.env, "ACP_UI_TRUSTED_HOST_ORIGINS"),
+    false,
   );
-  assert.equal(launcher.calls[0].options.env.ACP_UI_CORS_ORIGINS, origin);
+  assert.equal(response.payload.state, "started");
+});
+
+test("does not spawn ACP when Native host health is already ready", async () => {
+  const response = await handleNativeMessage(
+    { type: "start_acp_ui", requestId: "already-ready" },
+    {
+      fetchImpl: healthSequence(true),
+      spawnProcess: () => {
+        throw new Error("spawn must not be called for a healthy service");
+      },
+    },
+  );
+
+  assert.equal(response.payload.accepted, true);
+  assert.equal(response.payload.state, "already_healthy");
+  assert.equal(response.payload.pid, undefined);
+});
+
+test("deduplicates concurrent ACP starts across independent host requests", async (t) => {
+  const leasePath = path.join(temporaryDirectory(t), "launch.lock");
+  let initialProbes = 0;
+  let releaseInitialProbes;
+  const initialProbeBarrier = new Promise((resolve) => {
+    releaseInitialProbes = resolve;
+  });
+  let healthy = false;
+  const fetchImpl = async () => {
+    initialProbes += 1;
+    if (initialProbes <= 2) {
+      if (initialProbes === 2) releaseInitialProbes();
+      await initialProbeBarrier;
+      return healthResponse(false);
+    }
+    return healthResponse(healthy);
+  };
+  let spawnCount = 0;
+  const spawnProcess = () => {
+    spawnCount += 1;
+    const child = new EventEmitter();
+    child.pid = 100 + spawnCount;
+    child.unref = () => {};
+    queueMicrotask(() => {
+      healthy = true;
+      child.emit("spawn");
+    });
+    return child;
+  };
+
+  const options = {
+    fetchImpl,
+    spawnProcess,
+    retryDelayMs: 1,
+    startupTimeoutMs: 100,
+    leasePath,
+  };
+  const [first, second] = await Promise.all([
+    ensureAcpUiRunning(undefined, options),
+    ensureAcpUiRunning(undefined, options),
+  ]);
+
+  assert.equal(spawnCount, 1);
+  assert.deepEqual(
+    new Set([first.state, second.state]),
+    new Set(["started", "startup_in_progress"]),
+  );
+});
+
+test("preserves explicit caller environment without injecting extension origins", () => {
+  const existing = {
+    ACP_UI_CORS_ORIGINS: "http://localhost:53817,https://existing.example",
+    ACP_UI_TRUSTED_HOST_ORIGINS: "https://existing.example",
+  };
+  assert.deepEqual(
+    buildAcpEnvironment(`chrome-extension://${"a".repeat(32)}`, existing),
+    existing,
+  );
+});
+
+test("appends a trusted host through ACP's official runtime command", async () => {
+  const origin = `chrome-extension://${"a".repeat(32)}`;
+  const calls = [];
+  const events = [];
+  const spawnProcess = (command, args, options) => {
+    calls.push({ command, args, options });
+    const child = new EventEmitter();
+    queueMicrotask(() => child.emit("close", 0));
+    return child;
+  };
+
+  const granted = await grantTrustedHostWhenReady(origin, {
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ status: "ok", service: "acp-ui" }),
+    }),
+    spawnProcess,
+    platform: "darwin",
+    environment: { PATH: "/usr/bin" },
+    retryDelayMs: 0,
+    logger: { write: (event) => events.push(event) },
+  });
+
+  assert.equal(granted, true);
+  assert.equal(calls[0].command, "npx");
+  assert.deepEqual(calls[0].args, [...ACP_TRUSTED_HOST_ARGS, origin]);
+  assert.equal(Object.hasOwn(calls[0].options.env, "ACP_UI_CORS_ORIGINS"), false);
+  assert.deepEqual(events, [
+    "trusted_host_append_requested",
+    "trusted_host_append_succeeded",
+  ]);
 });
 
 test("writes structured launch logs and keeps child output off protocol stdout", async (t) => {
@@ -238,7 +376,13 @@ test("writes structured launch logs and keeps child output off protocol stdout",
       requestId: "logged-request",
       payload: { extensionOrigin: `chrome-extension://${"a".repeat(32)}` },
     },
-    { spawnProcess: launcher.spawnProcess, logger },
+    {
+      spawnProcess: launcher.spawnProcess,
+      logger,
+      fetchImpl: healthSequence(false, false, true),
+      retryDelayMs: 1,
+      leasePath: path.join(logDir, "launch.lock"),
+    },
   );
 
   assert.equal(response.payload.accepted, true);
@@ -249,7 +393,7 @@ test("writes structured launch logs and keeps child output off protocol stdout",
     .map((line) => JSON.parse(line));
   assert.deepEqual(
     records.map((record) => record.event),
-    ["acp_launch_requested", "acp_spawned"],
+    ["acp_launch_requested", "acp_spawned", "acp_startup_ready"],
   );
   assert.equal(records[1].childPid, 42);
   assert.equal(launcher.calls[0].options.stdio[0], "ignore");
@@ -259,7 +403,7 @@ test("writes structured launch logs and keeps child output off protocol stdout",
   );
 });
 
-test("launches ACP through cmd.exe on Windows without enabling a shell", async () => {
+test("launches ACP through cmd.exe on Windows without enabling a shell", async (t) => {
   const launcher = fakeSpawn();
   const comSpec = "C:\\Windows\\System32\\cmd.exe";
   const response = await handleNativeMessage(
@@ -268,6 +412,9 @@ test("launches ACP through cmd.exe on Windows without enabling a shell", async (
       spawnProcess: launcher.spawnProcess,
       platform: "win32",
       environment: { ComSpec: comSpec },
+      fetchImpl: healthSequence(false, false, true),
+      retryDelayMs: 1,
+      leasePath: path.join(temporaryDirectory(t), "launch.lock"),
     },
   );
 
@@ -290,14 +437,39 @@ test("direct fallback builds the same safe Windows ACP launch command", () => {
     command: comSpec,
     args: ["/d", "/s", "/c", "npx.cmd", "-y", "@axhub/acp@latest"],
   });
+  assert.deepEqual(
+    startAcpUi.buildTrustedHostLaunch("win32", { ComSpec: comSpec }, "origin"),
+    {
+      command: comSpec,
+      args: [
+        "/d",
+        "/s",
+        "/c",
+        "npx.cmd",
+        "-y",
+        "@axhub/acp@latest",
+        "trusted-host",
+        "add",
+        "origin",
+      ],
+    },
+  );
+  assert.deepEqual(buildTrustedHostLaunch("darwin", {}, "origin"), {
+    command: "npx",
+    args: [...ACP_TRUSTED_HOST_ARGS, "origin"],
+  });
 });
 
-test("returns NPX_NOT_FOUND when spawn cannot resolve npx", async () => {
+test("returns NPX_NOT_FOUND when spawn cannot resolve npx", async (t) => {
   const error = Object.assign(new Error("npx missing"), { code: "ENOENT" });
   const launcher = fakeSpawn({ error });
   const response = await handleNativeMessage(
     { type: "start_acp_ui" },
-    { spawnProcess: launcher.spawnProcess },
+    {
+      spawnProcess: launcher.spawnProcess,
+      fetchImpl: healthSequence(false, false),
+      leasePath: path.join(temporaryDirectory(t), "launch.lock"),
+    },
   );
   assert.equal(response.error.code, "NPX_NOT_FOUND");
   assert.equal(response.payload.accepted, false);
@@ -660,4 +832,43 @@ test("bundled host test resolves from the Skill rather than the current working 
       "../skills/axhub-commentary/scripts/acp-native-host.mjs",
     ),
   );
+});
+
+test("Chrome smoke fixture calls the registered ACP Native host", () => {
+  const fixtureDir = path.resolve(
+    testDir,
+    "../test-fixtures/acp-native-extension",
+  );
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(fixtureDir, "manifest.json"), "utf8"),
+  );
+  const background = fs.readFileSync(
+    path.join(fixtureDir, "background.js"),
+    "utf8",
+  );
+
+  assert.equal(manifest.manifest_version, 3);
+  assert.deepEqual(manifest.permissions, ["nativeMessaging"]);
+  assert.equal(manifest.action.default_popup, "test.html");
+  assert.match(background, /chrome\.runtime\.sendNativeMessage/u);
+  assert.match(background, /com\.axhub\.acp\.nativehost/u);
+});
+
+test("Chrome smoke fixture popup triggers and reports the Native host check", () => {
+  const fixtureDir = path.resolve(
+    testDir,
+    "../test-fixtures/acp-native-extension",
+  );
+  const popup = fs.readFileSync(path.join(fixtureDir, "test.html"), "utf8");
+  const popupScript = fs.readFileSync(
+    path.join(fixtureDir, "popup.js"),
+    "utf8",
+  );
+
+  assert.match(popup, /id="run-smoke-test"/u);
+  assert.match(popup, /id="smoke-test-result"/u);
+  assert.match(popup, /src="popup\.js"/u);
+  assert.match(popupScript, /chrome\.runtime\.sendMessage/u);
+  assert.match(popupScript, /run_acp_native_smoke_test/u);
+  assert.match(popupScript, /smoke-test-result/u);
 });
