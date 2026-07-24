@@ -10,6 +10,9 @@ import { fileURLToPath } from "node:url";
 import {
   BUNDLED_HOST_PATH,
   HOST_NAME,
+  PRIVATE_DIRECTORY_MODE,
+  PRIVATE_EXECUTABLE_MODE,
+  PRIVATE_FILE_MODE,
   extensionOrigin,
   installLayout,
   parseBrowser,
@@ -83,6 +86,54 @@ function readManifest(manifestPath) {
   }
 }
 
+function permissionMode(filePath) {
+  try {
+    return fs.statSync(filePath).mode & 0o777;
+  } catch {
+    return null;
+  }
+}
+
+function assertNoSymbolicLinks(paths) {
+  for (const filePath of paths) {
+    try {
+      if (fs.lstatSync(filePath).isSymbolicLink()) {
+        throw new Error(`Refusing to modify symbolic link: ${filePath}`);
+      }
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+}
+
+function secureLocalFiles(layout, manifestPath, nodeExecPath, platform) {
+  assertNoSymbolicLinks([
+    layout.installDir,
+    layout.logDir,
+    layout.hostPath,
+    layout.nodePathFile,
+    layout.wrapperPath,
+    manifestPath,
+  ]);
+  fs.writeFileSync(layout.nodePathFile, nodeExecPath, {
+    encoding: "utf8",
+    mode: PRIVATE_FILE_MODE,
+  });
+  if (platform === "win32") return;
+
+  fs.chmodSync(layout.installDir, PRIVATE_DIRECTORY_MODE);
+  fs.chmodSync(layout.logDir, PRIVATE_DIRECTORY_MODE);
+  fs.chmodSync(layout.hostPath, PRIVATE_FILE_MODE);
+  fs.chmodSync(layout.nodePathFile, PRIVATE_FILE_MODE);
+  fs.chmodSync(layout.wrapperPath, PRIVATE_EXECUTABLE_MODE);
+  if (fs.existsSync(manifestPath)) fs.chmodSync(manifestPath, PRIVATE_FILE_MODE);
+  for (const entry of fs.readdirSync(layout.logDir, { withFileTypes: true })) {
+    if (entry.isFile()) {
+      fs.chmodSync(path.join(layout.logDir, entry.name), PRIVATE_FILE_MODE);
+    }
+  }
+}
+
 async function checkAcpHealth(fetchImpl) {
   try {
     const response = await fetchImpl("http://localhost:32124/api/health", {
@@ -141,12 +192,11 @@ export async function collectDoctorReport({
       });
     } else {
       try {
-        if (platform !== "win32") fs.chmodSync(layout.wrapperPath, 0o755);
-        fs.writeFileSync(layout.nodePathFile, nodeExecPath, "utf8");
+        secureLocalFiles(layout, manifestPath, nodeExecPath, platform);
         fixes.push({
           id: "local-files",
           success: true,
-          message: "Fixed wrapper permissions and node_path.txt",
+          message: "Fixed local permissions and node_path.txt",
         });
       } catch (error) {
         fixes.push({
@@ -235,6 +285,58 @@ export async function collectDoctorReport({
       ? "Native host wrapper is executable"
       : "Wrapper is not executable",
     details: { path: layout.wrapperPath },
+  });
+
+  const privatePermissionPaths = [
+    {
+      path: layout.installDir,
+      expectedMode: PRIVATE_DIRECTORY_MODE,
+      required: true,
+    },
+    {
+      path: layout.logDir,
+      expectedMode: PRIVATE_DIRECTORY_MODE,
+      required: true,
+    },
+    { path: layout.hostPath, expectedMode: PRIVATE_FILE_MODE, required: true },
+    {
+      path: layout.nodePathFile,
+      expectedMode: PRIVATE_FILE_MODE,
+      required: true,
+    },
+    {
+      path: layout.wrapperPath,
+      expectedMode: PRIVATE_EXECUTABLE_MODE,
+      required: true,
+    },
+    { path: manifestPath, expectedMode: PRIVATE_FILE_MODE, required: true },
+    { path: layout.wrapperLogPath, expectedMode: PRIVATE_FILE_MODE },
+    { path: layout.hostLogPath, expectedMode: PRIVATE_FILE_MODE },
+    { path: layout.acpUiLogPath, expectedMode: PRIVATE_FILE_MODE },
+  ].map((entry) => ({ ...entry, mode: permissionMode(entry.path) }));
+  const privatePermissions = privatePermissionPaths.every(
+    ({ mode, expectedMode, required }) =>
+      mode === expectedMode || (!required && mode === null),
+  );
+  checks.push({
+    id: "host.private-permissions",
+    status:
+      platform === "win32" ? "warn" : privatePermissions ? "ok" : "error",
+    message:
+      platform === "win32"
+        ? "Native host ACLs were not verified"
+        : privatePermissions
+          ? "Native host files are private to the current user"
+          : "One or more Native host files have unsafe permissions",
+    details: {
+      paths: privatePermissionPaths.map(
+        ({ path: filePath, expectedMode, mode }) => ({
+          path: filePath,
+          expectedMode: expectedMode.toString(8),
+          mode: mode === null ? null : mode.toString(8),
+        }),
+      ),
+    },
   });
 
   const logDirectoryWritable = isWritable(layout.logDir);

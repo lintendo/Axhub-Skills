@@ -9,6 +9,9 @@ import { fileURLToPath } from "node:url";
 
 export const HOST_NAME = "com.axhub.acp.nativehost";
 export const HOST_DESCRIPTION = "Axhub ACP UI Native Messaging host";
+export const PRIVATE_DIRECTORY_MODE = 0o700;
+export const PRIVATE_FILE_MODE = 0o600;
+export const PRIVATE_EXECUTABLE_MODE = 0o700;
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 export const BUNDLED_HOST_PATH = path.join(scriptDir, "acp-native-host.mjs");
@@ -110,6 +113,7 @@ export function registryKey(browserValue) {
 function unixWrapper() {
   return `#!/usr/bin/env sh
 set -eu
+umask 077
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 NODE_EXEC=""
@@ -204,16 +208,36 @@ export function registerNativeHost({
   }
 
   const layout = installLayout({ platform, homeDir, environment });
-  fs.mkdirSync(layout.installDir, { recursive: true });
-  fs.mkdirSync(layout.logDir, { recursive: true });
+  fs.mkdirSync(layout.installDir, {
+    recursive: true,
+    mode: PRIVATE_DIRECTORY_MODE,
+  });
+  fs.mkdirSync(layout.logDir, {
+    recursive: true,
+    mode: PRIVATE_DIRECTORY_MODE,
+  });
   fs.copyFileSync(sourceHostPath, layout.hostPath);
-  fs.writeFileSync(layout.nodePathFile, nodeExecPath, "utf8");
+  fs.writeFileSync(layout.nodePathFile, nodeExecPath, {
+    encoding: "utf8",
+    mode: PRIVATE_FILE_MODE,
+  });
   fs.writeFileSync(
     layout.wrapperPath,
     platform === "win32" ? windowsWrapper() : unixWrapper(),
-    "utf8",
+    { encoding: "utf8", mode: PRIVATE_EXECUTABLE_MODE },
   );
-  if (platform !== "win32") fs.chmodSync(layout.wrapperPath, 0o755);
+  if (platform !== "win32") {
+    fs.chmodSync(layout.installDir, PRIVATE_DIRECTORY_MODE);
+    fs.chmodSync(layout.logDir, PRIVATE_DIRECTORY_MODE);
+    fs.chmodSync(layout.hostPath, PRIVATE_FILE_MODE);
+    fs.chmodSync(layout.nodePathFile, PRIVATE_FILE_MODE);
+    fs.chmodSync(layout.wrapperPath, PRIVATE_EXECUTABLE_MODE);
+    for (const entry of fs.readdirSync(layout.logDir, { withFileTypes: true })) {
+      if (entry.isFile()) {
+        fs.chmodSync(path.join(layout.logDir, entry.name), PRIVATE_FILE_MODE);
+      }
+    }
+  }
 
   const manifestPath = userManifestPath(browser, {
     platform,
@@ -234,8 +258,11 @@ export function registerNativeHost({
   fs.writeFileSync(
     manifestPath,
     `${JSON.stringify(manifest, null, 2)}\n`,
-    "utf8",
+    { encoding: "utf8", mode: PRIVATE_FILE_MODE },
   );
+  if (platform !== "win32") {
+    fs.chmodSync(manifestPath, PRIVATE_FILE_MODE);
+  }
 
   if (platform === "win32") {
     execFile(

@@ -6,6 +6,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import {
+  acpPortFromHealthUrl,
   buildNpxLaunch,
   buildTrustedHostLaunch,
   ensureAcpUiRunning,
@@ -24,7 +25,12 @@ export { buildNpxLaunch, buildTrustedHostLaunch };
 
 function appendTrustedHost(origin) {
   if (!origin) return Promise.resolve(true);
-  const launch = buildTrustedHostLaunch(process.platform, process.env, origin);
+  const launch = buildTrustedHostLaunch(
+    process.platform,
+    process.env,
+    origin,
+    acpPortFromHealthUrl(healthUrl),
+  );
   return new Promise((resolve) => {
     let child;
     try {

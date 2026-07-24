@@ -1,20 +1,20 @@
 ---
 name: axhub-commentary
-description: 处理 Axhub Commentary 完整工作流。首先检测并确认 ACP UI 可用，再生成可批注地址、读取页面批注文档、落实修改并更新批注状态，或在用户确认后写入删除标记；也可为已接入 @axhub/annotation 的页面准备标注编辑环境，或配置 AI 侧边栏对话、AI 批注执行、调整面板属性和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、可批注链接、comments.json、标注编辑按钮、修改标注内容、Annotation Runtime、annotationSourcePath、根据 Commentary 意见改代码、更新或清理批注、页面 AI、供应商安装登录、调整面板、方案切换或页面定位信息时使用。
+description: 处理 Axhub Commentary 完整工作流。优先读取本地页面批注文档，落实修改并更新批注状态，或在用户确认后写入删除标记；本地读取失败时再确认 ACP UI 并生成临时可批注地址。也可为已接入 @axhub/annotation 的页面准备标注编辑环境，或配置 AI 侧边栏对话、AI 批注执行、调整面板属性和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、可批注链接、comments.json、标注编辑按钮、修改标注内容、Annotation Runtime、annotationSourcePath、根据 Commentary 意见改代码、更新或清理批注、页面 AI、供应商安装登录、调整面板、方案切换或页面定位信息时使用。
 ---
 
 # Axhub Commentary 工作流
 
-先完成前置检查和工作线判断，再按任务读取对应的分文档。不要要求目标项目安装编辑器 runtime；编辑器由 Axhub Chrome 扩展或宿主预览环境提供。
+先判断工作线，再按任务读取对应的分文档和执行必要检查。不要要求目标项目安装编辑器 runtime；编辑器由 Axhub Chrome 扩展或宿主预览环境提供。
 
-## 0. 核心前置：检测 ACP UI
+## 0. 按需检测 ACP UI
 
-先访问 `http://localhost:32124/api/health`。只有响应同时满足 `status: "ok"` 和 `service: "acp-ui"`，才算 ACP UI 已就绪。端口占用、页面可打开或存在相关进程都不能代替该检测。
+批注读取与处理先直接读取本地 `comments.json`，不检测 ACP UI；只有本地批注无法定位、读取或通过格式校验时，才检测 ACP UI，并在服务就绪后生成临时可批注地址交给用户。用户直接要求生成可批注地址、使用 AI 对话/执行或宿主资源工具时，也需要检测。
 
-- 检测通过：直接继续工作流，不要启动 ACP UI。除非用户主动要求安装、注册或诊断 Native Host，否则不要读取启动文档。
-- 检测失败：此时才读取 `references/acp-native-bootstrap.md`，按原有非沙箱规则先启动并再次确认 health。Native Host 是后续可选能力，只有用户明确确认或主动要求安装时才注册。
+- 访问 `http://localhost:32124/api/health`，只有响应同时满足 `status: "ok"` 和 `service: "acp-ui"` 才算就绪；端口占用、页面可打开或存在相关进程都不能代替该检测。
+- 检测失败时才读取 `references/acp-native-bootstrap.md`，按原有非沙箱规则启动并再次确认 health。Native Host 是后续可选能力，只有用户明确确认或主动要求安装时才注册。
 
-Commentary 的 AI 对话、AI 批注执行、provider session、宿主资源工具和本地标注源读写依赖 ACP UI；未确认 health 时，不得宣称这些能力就绪。纯本地 tweak 读取回写、属性调整和页面内方案切换可继续。
+Commentary 的 AI 对话、AI 批注执行、provider session、宿主资源工具和本地标注源读写依赖 ACP UI；未确认 health 时，不得宣称这些能力就绪。本地批注记录与 tweak 的读取回写、属性调整和页面内方案切换不依赖 ACP UI。
 
 ## 工作分流
 
@@ -37,7 +37,7 @@ Commentary 的 AI 对话、AI 批注执行、provider session、宿主资源工�
 
 ### 4. AI 对话与批注执行（主要）
 
-任务涉及 AI 侧边栏对话、唤醒页面 AI、把批注交给 AI 执行、配置供应商，或排查供应商软件安装、终端可用性和登录授权时，读 `references/ai-capabilities.md`。供应商和默认项以 ACP UI 当前配置为准，不在 Skill 中维护静态名单。
+任务涉及 AI 侧边栏对话、唤醒页面 AI、把批注交给 AI 执行、配置供应商，或排查供应商软件安装、终端可用性和登录授权时，读 `references/ai-capabilities.md`。支持范围见该文档，实际可见项和默认项以 ACP UI 当前配置为准。
 
 ### 5. 页面侧接入（低频）
 
@@ -52,9 +52,9 @@ Commentary 的 AI 对话、AI 批注执行、provider session、宿主资源工�
 
 ## 实施顺序
 
-1. 先按上面的核心前置流程检测 ACP UI；只有检测失败时才读取 `references/acp-native-bootstrap.md`，不要提前加载启动细节。
-2. 优先判断任务是否属于主要流程 1、2、3 或 4；只有用户明确要求时才进入低频流程 5。
-3. 只读取命中流程的分文档，并按其中的完成条件执行。
+1. 先判断任务是否属于主要流程 1、2、3 或 4；只有用户明确要求时才进入低频流程 5。
+2. 只读取命中流程的分文档；批注处理先读本地记录，失败后才检测 ACP UI 并生成临时地址，其他流程按上面的使用条件检测。
+3. 需要检测且 health 失败时才读取 `references/acp-native-bootstrap.md`，不要提前加载启动细节。
 4. 批注处理成功后先写入 `completed` 并保留节点，再询问用户是否清除；用户确认后只写入删除标记，实际清理由扩展统一执行。临时地址默认不修改项目文件；页面侧接入完成后再验证回写能力。
 
 ## 交付要求

@@ -14,7 +14,7 @@
 
 标注源的推荐位置是当前 `filePath` 同目录下的 `annotation-source.json`。未声明 `annotationSourcePath` 时客户端自动尝试该位置；这是普通 HTML 和前端工程共同使用的零配置约定。
 
-开始本流程前，必须已经按主文档“0. 核心前置：ACP UI”确认服务健康并保持运行。
+开始本流程前，必须已经按主文档“0. 按需检测 ACP UI”确认服务健康并保持运行。
 
 ## 临时方案：拼接 URL 参数（推荐）
 
@@ -66,7 +66,7 @@ https://example.com/orders/42?projectPath=%2FUsers%2Fme%2Fshop&filePath=src%2Fpa
 
 ## 最小验证
 
-1. ACP UI 已按主文档的核心前置流程确认健康。
+1. ACP UI 已按主文档的按需检测流程确认健康。
 2. 最终 URL 能正常打开，原有 query 和 hash 未丢失。
 3. 解码后的 `projectPath` 指向真实项目根目录，`filePath` 指向对应实现文件。
 4. 打开批注后，AI 工作目录和文件定位与当前页面一致。

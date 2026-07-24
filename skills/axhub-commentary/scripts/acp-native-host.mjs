@@ -18,6 +18,8 @@ export const ACP_TRUSTED_HOST_ARGS = [
 export const HOST_LOG_FILE_NAME = "native-host.log";
 export const ACP_UI_LOG_FILE_NAME = "acp-ui.log";
 const DEFAULT_MAX_LOG_BYTES = 2 * 1024 * 1024;
+const PRIVATE_DIRECTORY_MODE = 0o700;
+const PRIVATE_FILE_MODE = 0o600;
 export const ACP_HEALTH_URL = "http://127.0.0.1:32124/api/health";
 export const ACP_LAUNCH_LEASE_DIR_NAME = "acp-ui-start.lock";
 export const ACP_LAUNCH_LEASE_TTL_MS = 120_000;
@@ -56,10 +58,25 @@ export function createFileLogger({
 
   const ensureLogDir = () => {
     try {
-      fs.mkdirSync(logDir, { recursive: true });
+      fs.mkdirSync(logDir, {
+        recursive: true,
+        mode: PRIVATE_DIRECTORY_MODE,
+      });
+      if (process.platform !== "win32") {
+        fs.chmodSync(logDir, PRIVATE_DIRECTORY_MODE);
+      }
       return true;
     } catch {
       return false;
+    }
+  };
+
+  const protectLogFile = (filePath) => {
+    if (process.platform === "win32") return;
+    try {
+      fs.chmodSync(filePath, PRIVATE_FILE_MODE);
+    } catch {
+      // Logging remains best effort when permissions cannot be tightened.
     }
   };
 
@@ -79,8 +96,9 @@ export function createFileLogger({
             pid: process.pid,
             ...details,
           })}\n`,
-          "utf8",
+          { encoding: "utf8", mode: PRIVATE_FILE_MODE },
         );
+        protectLogFile(hostLogPath);
       } catch {
         // Logging is best effort and cannot affect protocol responses.
       }
@@ -89,7 +107,9 @@ export function createFileLogger({
       if (!ensureLogDir()) return undefined;
       try {
         rotateLogFile(acpUiLogPath, maxBytes);
-        return fs.openSync(acpUiLogPath, "a");
+        const descriptor = fs.openSync(acpUiLogPath, "a", PRIVATE_FILE_MODE);
+        protectLogFile(acpUiLogPath);
+        return descriptor;
       } catch {
         return undefined;
       }
@@ -134,11 +154,11 @@ export function readNativeMessages(input) {
         };
       }
       messages.push(value);
-    } catch (error) {
+    } catch {
       return {
         messages,
         rest: buffer,
-        error: `Invalid native message JSON: ${error instanceof Error ? error.message : String(error)}`,
+        error: "Invalid native message JSON",
       };
     }
   }
@@ -203,8 +223,29 @@ export function buildNpxLaunch(platform, environment) {
   return { command: "npx", args: [...ACP_START_ARGS] };
 }
 
-export function buildTrustedHostLaunch(platform, environment, extensionOrigin) {
-  const args = [...ACP_TRUSTED_HOST_ARGS, extensionOrigin];
+export function acpPortFromHealthUrl(healthUrl = ACP_HEALTH_URL) {
+  const url = new URL(healthUrl);
+  const defaultPort =
+    url.protocol === "https:" ? 443 : url.protocol === "http:" ? 80 : 0;
+  const port = Number(url.port || defaultPort);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid ACP health URL port: ${healthUrl}`);
+  }
+  return port;
+}
+
+export function buildTrustedHostLaunch(
+  platform,
+  environment,
+  extensionOrigin,
+  port = acpPortFromHealthUrl(),
+) {
+  const args = [
+    ...ACP_TRUSTED_HOST_ARGS,
+    extensionOrigin,
+    "--port",
+    String(port),
+  ];
   if (platform === "win32") {
     return {
       command: environment.ComSpec || environment.COMSPEC || "cmd.exe",
@@ -356,17 +397,19 @@ export async function grantTrustedHostWhenReady(
     timeoutMs = TRUSTED_HOST_GRANT_TIMEOUT_MS,
     retryDelayMs = 500,
     logger = createFileLogger(),
+    healthUrl = environment.AXHUB_ACP_HEALTH_URL || ACP_HEALTH_URL,
   } = {},
 ) {
   if (!isValidExtensionOrigin(extensionOrigin)) return false;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await isAcpHealthy(fetchImpl)) {
+    if (await isAcpHealthy(fetchImpl, healthUrl)) {
       await wait(retryDelayMs);
       const launch = buildTrustedHostLaunch(
         platform,
         environment,
         extensionOrigin,
+        acpPortFromHealthUrl(healthUrl),
       );
       logger?.write?.("trusted_host_append_requested", {
         extensionOrigin,
@@ -640,7 +683,7 @@ export async function handleNativeMessage(message, options = {}) {
     return errorResponse(
       message,
       "UNKNOWN_MESSAGE",
-      `Unsupported native message: ${String(message?.type ?? "")}`,
+      "Unsupported native message type",
     );
   }
 
@@ -727,7 +770,7 @@ export function runNativeHost({
     try {
       logger?.write?.("response_sent", {
         type: response?.type || null,
-        responseToRequestId: response?.responseToRequestId || null,
+        hasResponseRequestId: Boolean(response?.responseToRequestId),
         accepted: response?.payload?.accepted === true,
         errorCode: response?.error?.code || null,
       });
@@ -753,10 +796,13 @@ export function runNativeHost({
     const message = parsed.messages[0];
     if (message) {
       processing = true;
+      const extensionOrigin = extensionOriginOf(message);
       logger?.write?.("message_received", {
-        type: typeof message.type === "string" ? message.type : null,
-        requestId: requestIdOf(message) || null,
-        extensionOrigin: extensionOriginOf(message) || null,
+        type: message.type === "start_acp_ui" ? message.type : null,
+        hasRequestId: Boolean(requestIdOf(message)),
+        extensionOrigin: isValidExtensionOrigin(extensionOrigin)
+          ? extensionOrigin
+          : null,
       });
       void handleNativeMessage(message, { logger, callerOrigin }).then(
         writeResponse,

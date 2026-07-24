@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import {
   ACP_START_ARGS,
   ACP_TRUSTED_HOST_ARGS,
+  acpPortFromHealthUrl,
   buildAcpEnvironment,
   buildTrustedHostLaunch,
   createFileLogger,
@@ -25,6 +26,9 @@ import { collectDoctorReport } from "../skills/axhub-commentary/scripts/doctor.m
 import {
   BUNDLED_HOST_PATH,
   HOST_NAME,
+  PRIVATE_DIRECTORY_MODE,
+  PRIVATE_EXECUTABLE_MODE,
+  PRIVATE_FILE_MODE,
   parseRegisterArgs,
   registerNativeHost,
 } from "../skills/axhub-commentary/scripts/register.mjs";
@@ -147,6 +151,17 @@ test("encodes and incrementally decodes Native Messaging frames", () => {
     { type: "start_acp_ui", requestId: "r1" },
   ]);
   assert.equal(parsed.rest.length, 0);
+});
+
+test("classifies malformed Native messages without echoing input", () => {
+  const body = Buffer.from('{"private-payload":', "utf8");
+  const header = Buffer.alloc(4);
+  header.writeUInt32LE(body.length, 0);
+
+  const parsed = readNativeMessages(Buffer.concat([header, body]));
+
+  assert.equal(parsed.error, "Invalid native message JSON");
+  assert.doesNotMatch(parsed.error, /private-payload/u);
 });
 
 test("accepts only exact Chromium extension origins", () => {
@@ -348,14 +363,22 @@ test("appends a trusted host through ACP's official runtime command", async () =
     }),
     spawnProcess,
     platform: "darwin",
-    environment: { PATH: "/usr/bin" },
+    environment: {
+      PATH: "/usr/bin",
+      AXHUB_ACP_HEALTH_URL: "http://127.0.0.1:43210/api/health",
+    },
     retryDelayMs: 0,
     logger: { write: (event) => events.push(event) },
   });
 
   assert.equal(granted, true);
   assert.equal(calls[0].command, "npx");
-  assert.deepEqual(calls[0].args, [...ACP_TRUSTED_HOST_ARGS, origin]);
+  assert.deepEqual(calls[0].args, [
+    ...ACP_TRUSTED_HOST_ARGS,
+    origin,
+    "--port",
+    "43210",
+  ]);
   assert.equal(Object.hasOwn(calls[0].options.env, "ACP_UI_CORS_ORIGINS"), false);
   assert.deepEqual(events, [
     "trusted_host_append_requested",
@@ -401,6 +424,13 @@ test("writes structured launch logs and keeps child output off protocol stdout",
     launcher.calls[0].options.stdio[1],
     launcher.calls[0].options.stdio[2],
   );
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(logDir).mode & 0o777, PRIVATE_DIRECTORY_MODE);
+    assert.equal(
+      fs.statSync(logger.hostLogPath).mode & 0o777,
+      PRIVATE_FILE_MODE,
+    );
+  }
 });
 
 test("launches ACP through cmd.exe on Windows without enabling a shell", async (t) => {
@@ -433,12 +463,18 @@ test("launches ACP through cmd.exe on Windows without enabling a shell", async (
 test("direct fallback builds the same safe Windows ACP launch command", () => {
   const comSpec = "C:\\Windows\\System32\\cmd.exe";
   assert.equal(typeof startAcpUi.buildNpxLaunch, "function");
+  assert.equal(acpPortFromHealthUrl("http://127.0.0.1:43210/api/health"), 43210);
   assert.deepEqual(startAcpUi.buildNpxLaunch("win32", { ComSpec: comSpec }), {
     command: comSpec,
     args: ["/d", "/s", "/c", "npx.cmd", "-y", "@axhub/acp@latest"],
   });
   assert.deepEqual(
-    startAcpUi.buildTrustedHostLaunch("win32", { ComSpec: comSpec }, "origin"),
+    startAcpUi.buildTrustedHostLaunch(
+      "win32",
+      { ComSpec: comSpec },
+      "origin",
+      43210,
+    ),
     {
       command: comSpec,
       args: [
@@ -451,12 +487,14 @@ test("direct fallback builds the same safe Windows ACP launch command", () => {
         "trusted-host",
         "add",
         "origin",
+        "--port",
+        "43210",
       ],
     },
   );
   assert.deepEqual(buildTrustedHostLaunch("darwin", {}, "origin"), {
     command: "npx",
-    args: [...ACP_TRUSTED_HOST_ARGS, "origin"],
+    args: [...ACP_TRUSTED_HOST_ARGS, "origin", "--port", "32124"],
   });
 });
 
@@ -545,7 +583,27 @@ test("registers the bundled host in a stable user directory and merges exact ori
     fs.readFileSync(BUNDLED_HOST_PATH, "utf8"),
   );
   assert.equal(fs.readFileSync(first.nodePathFile, "utf8"), process.execPath);
-  assert.ok((fs.statSync(first.wrapperPath).mode & 0o111) !== 0);
+  assert.equal(
+    fs.statSync(first.installDir).mode & 0o777,
+    PRIVATE_DIRECTORY_MODE,
+  );
+  assert.equal(
+    fs.statSync(first.logDir).mode & 0o777,
+    PRIVATE_DIRECTORY_MODE,
+  );
+  assert.equal(fs.statSync(first.hostPath).mode & 0o777, PRIVATE_FILE_MODE);
+  assert.equal(
+    fs.statSync(first.nodePathFile).mode & 0o777,
+    PRIVATE_FILE_MODE,
+  );
+  assert.equal(
+    fs.statSync(first.wrapperPath).mode & 0o777,
+    PRIVATE_EXECUTABLE_MODE,
+  );
+  assert.equal(
+    fs.statSync(first.manifestPath).mode & 0o777,
+    PRIVATE_FILE_MODE,
+  );
   assert.match(fs.readFileSync(first.wrapperPath, "utf8"), /host\.mjs" "\$@"/u);
   assert.ok(first.hostPath.startsWith(path.join(homeDir, ".axhub")));
   assert.ok(
@@ -615,6 +673,8 @@ test(
     assert.match(hostLog, /"event":"host_started"/u);
     assert.match(hostLog, /"event":"message_received"/u);
     assert.match(hostLog, /"event":"response_sent"/u);
+    assert.doesNotMatch(hostLog, /wrapper-test/u);
+    assert.doesNotMatch(hostLog, /unknown/u);
   },
 );
 
@@ -680,6 +740,11 @@ test("doctor does not report ready when the Windows registry key is missing", as
   assert.equal(
     report.checks.find((check) => check.id === "registry").status,
     "error",
+  );
+  assert.equal(
+    report.checks.find((check) => check.id === "host.private-permissions")
+      .status,
+    "warn",
   );
   assert.equal(report.ok, false);
 });
@@ -786,7 +851,7 @@ test("doctor --check-acp fails readiness when the health request errors", async 
   assert.equal(report.ok, false);
 });
 
-test("doctor --fix changes only wrapper permissions and node_path.txt", async (t) => {
+test("doctor --fix restores owner-only permissions and node_path.txt", async (t) => {
   const homeDir = temporaryDirectory(t);
   const extensionId = "e".repeat(32);
   const registration = registerNativeHost({
@@ -798,8 +863,13 @@ test("doctor --fix changes only wrapper permissions and node_path.txt", async (t
   });
   const manifestBefore = fs.readFileSync(registration.manifestPath, "utf8");
   const hostBefore = fs.readFileSync(registration.hostPath, "utf8");
+  fs.chmodSync(registration.installDir, 0o755);
+  fs.chmodSync(registration.logDir, 0o755);
+  fs.chmodSync(registration.hostPath, 0o644);
   fs.chmodSync(registration.wrapperPath, 0o644);
   fs.writeFileSync(registration.nodePathFile, "/missing/node", "utf8");
+  fs.chmodSync(registration.nodePathFile, 0o644);
+  fs.chmodSync(registration.manifestPath, 0o644);
 
   const report = await collectDoctorReport({
     browser: "chrome",
@@ -812,7 +882,35 @@ test("doctor --fix changes only wrapper permissions and node_path.txt", async (t
 
   assert.equal(report.fixes[0].success, true);
   assert.equal(report.ok, true);
-  assert.ok((fs.statSync(registration.wrapperPath).mode & 0o111) !== 0);
+  assert.equal(
+    report.checks.find((check) => check.id === "host.private-permissions")
+      .status,
+    "ok",
+  );
+  assert.equal(
+    fs.statSync(registration.installDir).mode & 0o777,
+    PRIVATE_DIRECTORY_MODE,
+  );
+  assert.equal(
+    fs.statSync(registration.logDir).mode & 0o777,
+    PRIVATE_DIRECTORY_MODE,
+  );
+  assert.equal(
+    fs.statSync(registration.hostPath).mode & 0o777,
+    PRIVATE_FILE_MODE,
+  );
+  assert.equal(
+    fs.statSync(registration.wrapperPath).mode & 0o777,
+    PRIVATE_EXECUTABLE_MODE,
+  );
+  assert.equal(
+    fs.statSync(registration.nodePathFile).mode & 0o777,
+    PRIVATE_FILE_MODE,
+  );
+  assert.equal(
+    fs.statSync(registration.manifestPath).mode & 0o777,
+    PRIVATE_FILE_MODE,
+  );
   assert.equal(
     fs.readFileSync(registration.nodePathFile, "utf8"),
     process.execPath,
@@ -822,6 +920,53 @@ test("doctor --fix changes only wrapper permissions and node_path.txt", async (t
     manifestBefore,
   );
   assert.equal(fs.readFileSync(registration.hostPath, "utf8"), hostBefore);
+});
+
+test(
+  "doctor --fix refuses to write through managed symlinks",
+  { skip: process.platform === "win32" },
+  async (t) => {
+    const homeDir = temporaryDirectory(t);
+    const registration = registerNativeHost({
+      confirmed: true,
+      browser: "chrome",
+      extensionId: "e".repeat(32),
+      platform: "darwin",
+      homeDir,
+    });
+    const outsidePath = path.join(homeDir, "outside.txt");
+    fs.writeFileSync(outsidePath, "keep", "utf8");
+    fs.rmSync(registration.nodePathFile);
+    fs.symlinkSync(outsidePath, registration.nodePathFile);
+
+    const report = await collectDoctorReport({
+      browser: "chrome",
+      extensionId: "e".repeat(32),
+      fix: true,
+      platform: "darwin",
+      homeDir,
+      execFile: doctorExec,
+    });
+
+    assert.equal(report.fixes[0].success, false);
+    assert.match(report.fixes[0].message, /symbolic link/u);
+    assert.equal(fs.readFileSync(outsidePath, "utf8"), "keep");
+  },
+);
+
+test("local comment processing requires unambiguous identities", () => {
+  const source = fs.readFileSync(
+    path.resolve(
+      testDir,
+      "../skills/axhub-commentary/references/comment-processing.md",
+    ),
+    "utf8",
+  );
+
+  assert.match(source, /批注.*id.*唯一/u);
+  assert.match(source, /资源.*assetId.*唯一/u);
+  assert.match(source, /commentId.*现有批注/u);
+  assert.match(source, /生成并固定.*requestId.*sessionId/u);
 });
 
 test("bundled host test resolves from the Skill rather than the current working directory", () => {

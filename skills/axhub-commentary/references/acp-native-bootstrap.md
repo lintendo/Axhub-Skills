@@ -30,10 +30,10 @@ node "<skill-dir>/scripts/start-acp-ui.mjs"
 脚本只接受 32 位 Chromium 扩展 ID，并转换为精确 origin；不要设置 wildcard。启动时不写入 `ACP_UI_CORS_ORIGINS` 或 `ACP_UI_TRUSTED_HOST_ORIGINS`，始终保留 `@axhub/acp` 自己的默认来源列表。health 就绪后，脚本通过 ACP 官方命令执行进程内追加：
 
 ```bash
-npx -y @axhub/acp@latest trusted-host add chrome-extension://<extension-id>
+npx -y @axhub/acp@latest trusted-host add chrome-extension://<extension-id> --port 32124
 ```
 
-这个命令只追加 trusted host，不追加 CORS，不修改 ACP 的启动默认值。ACP 当前版本没有运行时追加 CORS 的公开入口；非默认扩展 origin 如果还需要直接访问资源 API，必须先由 ACP 提供追加式 CORS 能力，Skill 不得通过设置 `ACP_UI_CORS_ORIGINS` 覆盖整份默认列表。
+这个命令只向明确端口对应的进程追加 trusted host，不追加 CORS，不修改 ACP 的启动默认值。脚本会从实际 health URL 解析并传递端口，避免测试实例和默认实例并存时追加到错误进程。ACP 当前版本没有运行时追加 CORS 的公开入口；非默认扩展 origin 如果还需要直接访问资源 API，必须先由 ACP 提供追加式 CORS 能力，Skill 不得通过设置 `ACP_UI_CORS_ORIGINS` 覆盖整份默认列表。
 
 只处理 Chromium 内核浏览器扩展。Chrome、Edge、Brave、Arc、Opera 等浏览器的扩展页面都使用 `chrome-extension://`。非默认安装先从扩展管理页读取真实 ID，不要猜测或沿用其他浏览器的 ID。
 
@@ -67,6 +67,8 @@ node "<skill-dir>/scripts/doctor.mjs" --json --browser edge --extension-id ahkkn
 
 注册脚本按平台生成 `run_host.sh` 或 `run_host.bat`，写入 `node_path.txt`、用户级 manifest 和 Windows HKCU registry。重复注册会合并真实扩展 origin；禁止 wildcard。注册始终是显式用户级操作，不自动触发 sudo/UAC。
 
+在 macOS/Linux 上，注册目录和日志目录使用 `0700`，host、Node 路径、manifest 与日志文件使用 `0600`，wrapper 使用 `0700`。这样 Native Host 的运行元数据与 ACP 子进程输出只对当前用户可见。结构化 Host 日志不记录消息正文或原始 request ID；扩展 origin、事件名、PID、状态和错误码仍会保留用于诊断。Windows 使用当前用户目录和 HKCU 注册，访问控制沿用当前用户配置目录的 ACL。
+
 Native host 收到请求后会自行再次检测 health；服务健康时直接复用，服务不可用时与直接 fallback 共用用户目录下的原子启动租约。只有租约持有者可以创建不带 CORS/Trusted Host 覆盖参数的 `npx -y @axhub/acp@latest` 进程，其他请求等待同一 health 结果，不得重复启动。health 就绪后，Native host 另起轻量 worker 执行官方 `trusted-host add`，仅追加当前精确 origin。它不运行 Skill，不执行注册、权限修复或脚本注入，也不修改 ACP 默认 CORS 列表。页面 Runtime 或启动脚本的注入只由 Skill/AI 负责；ACP UI 和 Native host 都不得向扩展注入脚本。
 
 注册后的运行日志位于 `~/.axhub/acp-native-host/logs/`（Windows 为 `%LOCALAPPDATA%\Axhub\acp-native-host\logs\`）：`wrapper.log` 记录浏览器调用 wrapper，`native-host.log` 记录结构化协议与启动事件，`acp-ui.log` 记录 NPX/ACP UI 子进程输出。Native Messaging stdout 始终只写长度前缀帧，不写诊断文本；排障时优先检查这些文件和 doctor 的 `host.logs` 项。
@@ -79,12 +81,12 @@ Native host 收到请求后会自行再次检测 health；服务健康时直接�
 node "<skill-dir>/scripts/doctor.mjs" --json --browser chrome --extension-id <extension-id>
 ```
 
-需要修复用户目录中的 wrapper 权限和 `node_path.txt` 时，显式执行：
+需要在 macOS/Linux 收紧 owner-only 权限或更新 `node_path.txt` 时，显式执行：
 
 ```bash
 node "<skill-dir>/scripts/doctor.mjs" --fix --browser chrome --extension-id <extension-id>
 ```
 
-`doctor --fix` 不复制 host、不写 manifest、不注册、不提权。host 缺失或与 Skill 版本不一致时，先重新取得用户确认，再带 `--confirm-native-host-install` 显式执行 `register.mjs`。
+`doctor --fix` 不复制 host、不改 manifest 内容、不注册、不提权；它只更新 `node_path.txt`，并在 macOS/Linux 把已有安装目录、host、wrapper、manifest 与日志权限收紧到上文模式。host 缺失或与 Skill 版本不一致时，先重新取得用户确认，再带 `--confirm-native-host-install` 显式执行 `register.mjs`。
 
 诊断或修复完成后重新执行 health 检测。未确认 health 前，不得宣称 ACP UI、AI 能力或 AnnotationSource 编辑已经就绪。
