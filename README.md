@@ -16,6 +16,7 @@
 | **`extract-page-data`** | **通用网页深度 X 光机** | *“打开这个页面，帮我输出长截图、提取页面视觉色板代码，并把文案骨架直接转成 Markdown。”* |
 | **`generate-theme`** | **设计系统自动发电机** | *“分析特定页面的视觉风格，直接生成能够用于开发的 `DESIGN.md` 设计体系规范和 Tailwind v4 主题文件。”* |
 | **`axhub-commentary`** | **Commentary 完整工作流** | *“读取 Axhub Chrome 页面批注、完成改稿和任务清理，也可以开启 Annotation 标注编辑环境，让用户直接创建或修改页面标注内容。”* |
+| **`figma-content-operator`** | **Figma 内容操作器** | *“读取或修改当前 Figma 设计，导出内容，并把设计与项目代码关联起来。”* |
 | **`git-repo-beginner-guide`** | **Git 仓库新手协作向导** | *“我不熟 Git，帮我把这个项目安全提交到 GitHub / GitLab，并告诉我哪些地方需要确认授权或处理冲突。”* |
 | **`react-to-figma-make`** | **Figma Make 离线铸造师** | *“这个 React 项目开发完了，帮我逆向转换为 Figma Make 项目格式，并打包出可直接扔进 Figma 客户端呈现的 `.fig` 二进制文件。”* |
 | **`mcp-installer`** | **上下文协议 (MCP) 极速装配** | *“这里有一个提供服务的工具包，帮我自动化一键将这套 MCP 协议安装并兼容配置到当前主控的 AI IDE 中。”* |

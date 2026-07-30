@@ -1,0 +1,75 @@
+{
+  "skill_name": "figma-content-operator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我当前打开的是一个 Figma Web 文件，帮我启动 Drafito，并确认 AI 到 Figma 的链路真的已经连通。",
+      "expected_output": "先启动并保持任务级 MCP Relay，再根据用户当前的 Figma 设计文件 URL 生成 Drafito 启动 URL，引导用户在 Figma 中确认启动，并使用端到端 ping 工具验证连接；任务结束后只停止本次 Relay。",
+      "files": [],
+      "expectations": [
+        "在生成和发送 Drafito 启动链接前启动任务级 Relay",
+        "使用 launch-url 启动 Drafito，不虚构 Community URL",
+        "报告成功前要求 hop=e2e 且存在 plugin 数据",
+        "任务完成、取消或失败后停止本次任务启动的准确 Relay 进程",
+        "当中继绑定到 127.0.0.1 时，能够诊断 localhost 被解析为 ::1 的问题"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "读取我在 Figma 里选中的节点，告诉我它的布局、文字和颜色，不要把一百多个 MCP 工具全塞进上下文。",
+      "expected_output": "先调用 get_selection，再渐进查询相关 schema，然后检查目标节点或精简设计上下文并总结结果。",
+      "files": [],
+      "expectations": [
+        "从 get_selection 开始",
+        "不请求完整原始工具目录",
+        "使用聚焦的后续读取并报告节点 ID"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "把当前选中的卡片标题改成“企业版”，再确认确实改成功了。",
+      "expected_output": "验证连接和 profile，读取选中目标，检查 set_text schema，执行限定范围的写入并再次读取节点验证。",
+      "files": [],
+      "expectations": [
+        "写入前读取目标",
+        "只对已确认的 TEXT 节点 ID 使用 set_text",
+        "通过聚焦读取验证结果"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "这个插件有一百多个 Figwright 工具。先告诉我与变量、样式有关的工具有哪些，再查 bind_variable_to_paint 的参数；不要一次加载所有工具 schema。",
+      "expected_output": "读取包含 104 个工具的精简索引，只选择样式与变量领域，再通过包装器获取 bind_variable_to_paint 这一个工具的 schema。",
+      "files": [],
+      "expectations": [
+        "使用随附的完整精简索引",
+        "只读取样式与变量领域参考文档",
+        "只查询 bind_variable_to_paint 的实时 schema"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "把当前选中的三个图标导出为 SVG 到我指定的项目 assets/icons 目录，并告诉我实际生成了哪些文件。",
+      "expected_output": "验证当前 Figma 页面和选区，只检查 save_screenshots schema，解析用户指定的输出目录，把选中节点导出为 SVG，并报告实际写入的准确文件路径。",
+      "files": [],
+      "expectations": [
+        "导出前确认选中节点 ID",
+        "使用用户明确指定范围的输出目录",
+        "只获取 save_screenshots schema",
+        "报告准确的生成文件路径和部分失败"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "分析这个前端项目已有的组件和 token，再把我选中的 Figma 卡片对齐到现有代码实现，不要凭颜色相似就硬猜映射。",
+      "expected_output": "使用 analyze_project 和 scan_components 分析本地项目，读取所选 Figma 节点的设计上下文，再只查询建立证据映射所需的 component_map 和 token_map schema。",
+      "files": [],
+      "expectations": [
+        "对本地代码库使用 analyze_project 和 scan_components",
+        "读取所选 Figma 节点有范围限制的设计上下文",
+        "检查设计与代码两侧之后才使用 component_map 或 token_map",
+        "区分显式绑定与基于值推断的匹配"
+      ]
+    }
+  ]
+}
