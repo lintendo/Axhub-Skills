@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const MCP_INSPECTOR_SPEC = '@modelcontextprotocol/inspector@2.0.0';
@@ -97,6 +98,54 @@ function formatResult(result) {
   return `${result.body || result.stderr || result.stdout}\n`;
 }
 
+function imageExtension(mimeType) {
+  switch (String(mimeType || '').toLowerCase()) {
+    case 'image/jpeg':
+      return 'jpg';
+    case 'image/webp':
+      return 'webp';
+    case 'image/gif':
+      return 'gif';
+    case 'image/svg+xml':
+      return 'svg';
+    case 'image/png':
+    default:
+      return 'png';
+  }
+}
+
+function sanitizeInlineImages(value, artifacts, cursor = { index: 0 }) {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeInlineImages(item, artifacts, cursor));
+  }
+  if (!value || typeof value !== 'object') return value;
+  if (value.type === 'image' && isNonEmptyString(value.data)) {
+    const artifact = artifacts[cursor.index];
+    cursor.index += 1;
+    return {
+      type: 'image',
+      mimeType: value.mimeType || artifact?.mimeType,
+      path: artifact?.path,
+      bytes: artifact?.bytes,
+    };
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      sanitizeInlineImages(item, artifacts, cursor),
+    ]),
+  );
+}
+
+export function formatCallResult(result, imageArtifacts = []) {
+  if (imageArtifacts.length === 0) return formatResult(result);
+  return `${JSON.stringify({
+    result: sanitizeInlineImages(result.payload, imageArtifacts),
+    images: imageArtifacts,
+    nextAction: '使用宿主的图片查看能力打开 images[].path，再进行视觉判断。',
+  }, null, 2)}\n`;
+}
+
 export function isToolFailure(result) {
   return result.payload?.isError === true || TOOL_ERROR_PATTERN.test(result.body);
 }
@@ -160,7 +209,43 @@ export function extractInspectorPayload(method, envelope) {
   return result;
 }
 
-function runInspectorCli(method, args = []) {
+export function extractInspectorImageBlocks(method, envelope) {
+  if (method !== 'tools/call') return [];
+  const content = Array.isArray(envelope?.result?.content)
+    ? envelope.result.content
+    : [];
+  return content.filter((block) =>
+    block?.type === 'image' &&
+    isNonEmptyString(block.data) &&
+    isNonEmptyString(block.mimeType),
+  );
+}
+
+export function materializeImageBlocks(
+  imageBlocks,
+  { outputRoot = tmpdir(), toolName = 'figwright' } = {},
+) {
+  if (!Array.isArray(imageBlocks) || imageBlocks.length === 0) return [];
+  const safeToolName = String(toolName || 'figwright').replace(/[^a-z0-9-]+/giu, '-');
+  const directory = mkdtempSync(join(outputRoot, `${safeToolName}-`));
+  return imageBlocks.map((block, index) => {
+    const bytes = Buffer.from(block.data, 'base64');
+    const path = join(directory, `${index + 1}.${imageExtension(block.mimeType)}`);
+    writeFileSync(path, bytes, { flag: 'wx' });
+    return {
+      mimeType: block.mimeType,
+      path,
+      bytes: bytes.length,
+    };
+  });
+}
+
+export function formatInspectorToolResult(result, options = {}) {
+  const imageArtifacts = materializeImageBlocks(result.imageBlocks, options);
+  return formatCallResult(result, imageArtifacts);
+}
+
+function runInspectorCli(method, args = [], { toolName = 'figwright' } = {}) {
   const invocation = [
     ...NPX_ARGS_PREFIX,
     '-y',
@@ -203,10 +288,15 @@ function runInspectorCli(method, args = []) {
     stderr,
     body,
     payload: extractInspectorPayload(method, envelope),
+    imageBlocks: extractInspectorImageBlocks(method, envelope),
   };
 
   if (normalized.status !== 0) {
-    process.stderr.write(formatResult(normalized));
+    process.stderr.write(
+      method === 'tools/call'
+        ? formatInspectorToolResult(normalized, { toolName })
+        : formatResult(normalized),
+    );
     process.exit(normalized.status);
   }
   return normalized;
@@ -218,7 +308,7 @@ function callTool(toolName, args) {
     toolName,
     '--tool-args-json',
     JSON.stringify(args),
-  ]);
+  ], { toolName });
 }
 
 export function isSupportedNodeVersion(version) {
@@ -476,10 +566,10 @@ function runCall(toolName, rawArgs) {
   if (!toolName) fail('call 需要工具名称。');
   const result = callTool(toolName, readToolArgs(rawArgs));
   if (isToolFailure(result)) {
-    process.stderr.write(formatResult(result));
+    process.stderr.write(formatInspectorToolResult(result, { toolName }));
     process.exit(2);
   }
-  process.stdout.write(formatResult(result));
+  process.stdout.write(formatInspectorToolResult(result, { toolName }));
 }
 
 function main() {

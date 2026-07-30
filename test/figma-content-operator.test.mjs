@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -219,6 +219,96 @@ test('supports the MCP Inspector Node floor and unwraps Inspector JSON envelopes
   );
 });
 
+test('materializes Inspector image blocks without printing base64 to the terminal', async (context) => {
+  const module = await import(pathToFileURL(scriptPath));
+  const outputRoot = mkdtempSync(join(tmpdir(), 'figwright-images-test-'));
+  const imageBytes = Buffer.from('fake-png-bytes');
+  const imageData = imageBytes.toString('base64');
+  const envelope = {
+    result: {
+      content: [
+        { type: 'text', text: '{"nodeId":"1:42"}' },
+        { type: 'image', mimeType: 'image/png', data: imageData },
+      ],
+    },
+  };
+  context.after(() => rmSync(outputRoot, { recursive: true, force: true }));
+
+  const imageBlocks = module.extractInspectorImageBlocks('tools/call', envelope);
+  const artifacts = module.materializeImageBlocks(imageBlocks, {
+    outputRoot,
+    toolName: 'get_screenshot',
+  });
+  const formatted = module.formatCallResult(
+    { payload: module.extractInspectorPayload('tools/call', envelope) },
+    artifacts,
+  );
+
+  assert.equal(artifacts.length, 1);
+  assert.equal(artifacts[0].mimeType, 'image/png');
+  assert.equal(existsSync(artifacts[0].path), true);
+  assert.deepEqual(readFileSync(artifacts[0].path), imageBytes);
+  assert.match(formatted, /"nodeId": "1:42"/u);
+  assert.match(formatted, /"images"/u);
+  assert.match(formatted, /"path"/u);
+  assert.doesNotMatch(formatted, new RegExp(imageData, 'u'));
+
+  const imageOnlyEnvelope = {
+    result: { content: [{ type: 'image', mimeType: 'image/png', data: imageData }] },
+  };
+  const imageOnlyFormatted = module.formatCallResult(
+    { payload: module.extractInspectorPayload('tools/call', imageOnlyEnvelope) },
+    artifacts,
+  );
+  assert.match(imageOnlyFormatted, new RegExp(artifacts[0].path, 'u'));
+  assert.doesNotMatch(imageOnlyFormatted, new RegExp(imageData, 'u'));
+
+  const errorEnvelope = {
+    result: {
+      isError: true,
+      content: [{ type: 'image', mimeType: 'image/png', data: imageData }],
+    },
+  };
+  const errorFormatted = module.formatInspectorToolResult({
+    payload: module.extractInspectorPayload('tools/call', errorEnvelope),
+    imageBlocks: module.extractInspectorImageBlocks('tools/call', errorEnvelope),
+  }, { outputRoot, toolName: 'get_screenshot' });
+  assert.match(errorFormatted, /"isError": true/u);
+  assert.match(errorFormatted, /"path"/u);
+  assert.doesNotMatch(errorFormatted, new RegExp(imageData, 'u'));
+
+  const source = readFileSync(scriptPath, 'utf8');
+  const runCallStart = source.indexOf('function runCall');
+  const mainStart = source.indexOf('function main', runCallStart);
+  assert.notEqual(runCallStart, -1);
+  assert.notEqual(mainStart, -1);
+  const runCallSource = source.slice(runCallStart, mainStart);
+  assert.match(runCallSource, /formatInspectorToolResult\(result/u);
+  assert.doesNotMatch(runCallSource, /formatResult\(result\)/u);
+
+  const svgArtifacts = module.materializeImageBlocks([
+    {
+      type: 'image',
+      mimeType: 'image/svg+xml',
+      data: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64'),
+    },
+  ], { outputRoot, toolName: 'get_screenshot' });
+  assert.match(svgArtifacts[0].path, /\.svg$/u);
+
+  const guidance = readFileSync(
+    resolve(skillDir, 'references/read-and-inspect.md'),
+    'utf8',
+  );
+  assert.match(guidance, /images\[\]\.path/u);
+  assert.match(guidance, /图片查看能力/u);
+  const toolGuidance = readFileSync(
+    resolve(skillDir, 'references/tools/export-and-grounding.md'),
+    'utf8',
+  );
+  assert.match(toolGuidance, /临时文件路径/u);
+  assert.doesNotMatch(toolGuidance, /向模型返回/u);
+});
+
 test('accepts only complete end-to-end Figma and metadata contracts', async () => {
   const { isEndToEndPingPayload, isMetadataPayload } = await import(
     pathToFileURL(scriptPath)
@@ -322,11 +412,19 @@ test('pins the tested server and official MCP Inspector CLI versions', () => {
   const windowsConfig = JSON.parse(readFileSync(windowsConfigPath, 'utf8'));
   assert.deepEqual(config.mcpServers.figwright.args, ['-y', '@figwright/mcp@0.3.0']);
   assert.equal(config.mcpServers.figwright.command, 'npx');
+  assert.equal(config.mcpServers.figwright.connectionTimeout, 30_000);
+  assert.equal(config.mcpServers.figwright.requestTimeout, 180_000);
+  assert.equal('init_timeout' in config.mcpServers.figwright, false);
+  assert.equal('tool_timeout' in config.mcpServers.figwright, false);
   assert.equal(windowsConfig.mcpServers.figwright.command, 'cmd.exe');
   assert.deepEqual(
     windowsConfig.mcpServers.figwright.args,
     ['/d', '/s', '/c', 'npx.cmd', ...config.mcpServers.figwright.args],
   );
+  assert.equal(windowsConfig.mcpServers.figwright.connectionTimeout, 30_000);
+  assert.equal(windowsConfig.mcpServers.figwright.requestTimeout, 180_000);
+  assert.equal('init_timeout' in windowsConfig.mcpServers.figwright, false);
+  assert.equal('tool_timeout' in windowsConfig.mcpServers.figwright, false);
   const source = readFileSync(scriptPath, 'utf8');
   assert.match(source, /@modelcontextprotocol\/inspector@2\.0\.0/u);
   assert.match(source, /'--cli'/u);
