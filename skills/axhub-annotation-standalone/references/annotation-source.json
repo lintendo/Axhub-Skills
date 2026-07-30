@@ -1,6 +1,9 @@
 {
   "documentVersion": 1,
   "format": "axhub-annotation-source",
+  "presentation": {
+    "layerSelectors": [".example-modal-layer[data-open=\"true\"]"]
+  },
   "data": {
     "version": 2,
     "prototypeName": "standalone-annotation-demo",
@@ -52,6 +55,42 @@
             ]
           }
         ],
+        "createdAt": 1779667200000,
+        "updatedAt": 1779667200000
+      },
+      {
+        "id": "modal-background-target",
+        "index": 3,
+        "title": "打开发布任务",
+        "pageId": "overview",
+        "locator": {
+          "selectors": ["[data-annotation-id=\"modal-background-target\"]"],
+          "fingerprint": "button|modal-background-target",
+          "path": []
+        },
+        "aiPrompt": "说明弹窗打开后的背景标注可见性。",
+        "annotationText": "弹窗打开时隐藏背景 marker，关闭后恢复。",
+        "hasMarkdown": false,
+        "color": "#0F766E",
+        "images": [],
+        "createdAt": 1779667200000,
+        "updatedAt": 1779667200000
+      },
+      {
+        "id": "modal-content-target",
+        "index": 4,
+        "title": "发布任务弹窗",
+        "pageId": "overview",
+        "locator": {
+          "selectors": ["[data-annotation-id=\"modal-content-target\"]"],
+          "fingerprint": "section|modal-content-target",
+          "path": []
+        },
+        "aiPrompt": "说明活动前景层内的标注。",
+        "annotationText": "弹窗内容位于活动层根内，marker 保持可见。",
+        "hasMarkdown": false,
+        "color": "#E11D48",
+        "images": [],
         "createdAt": 1779667200000,
         "updatedAt": 1779667200000
       }

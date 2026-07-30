@@ -59,6 +59,26 @@
       p {
         margin: 0;
       }
+
+      .example-modal-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        background: rgba(17, 24, 39, 0.5);
+      }
+
+      .example-modal-layer[hidden] {
+        display: none;
+      }
+
+      .example-modal-layer [role="dialog"] {
+        width: min(420px, calc(100% - 32px));
+        padding: 24px;
+        border-radius: 8px;
+        background: #ffffff;
+      }
     </style>
   </head>
   <body>
@@ -72,6 +92,9 @@
         <h1>@axhub/annotation</h1>
         <p>这是一个普通 HTML 宿主接入示例。</p>
       </section>
+      <button type="button" data-annotation-id="modal-background-target" data-modal-open>
+        新建发布任务
+      </button>
     </section>
 
     <section data-page="states" hidden>
@@ -82,11 +105,21 @@
       </article>
     </section>
 
+    <div class="example-modal-layer" data-open="false" hidden>
+      <section role="dialog" aria-modal="true" data-annotation-id="modal-content-target">
+        <h2>新建发布任务</h2>
+        <button type="button" data-modal-close>关闭</button>
+      </section>
+    </div>
+
     <script src="./axhub-annotation.global.js"></script>
     <script>
       const annotationSource = {
         documentVersion: 1,
         format: 'axhub-annotation-source',
+        presentation: {
+          layerSelectors: ['.example-modal-layer[data-open="true"]'],
+        },
         data: {
           version: 2,
           prototypeName: 'standalone-annotation-demo',
@@ -138,6 +171,42 @@
                   ],
                 },
               ],
+              createdAt: 1779667200000,
+              updatedAt: 1779667200000,
+            },
+            {
+              id: 'modal-background-target',
+              index: 3,
+              title: '打开发布任务',
+              pageId: 'overview',
+              locator: {
+                selectors: ['[data-annotation-id="modal-background-target"]'],
+                fingerprint: 'button|modal-background-target',
+                path: [],
+              },
+              aiPrompt: '说明弹窗打开后的背景标注可见性。',
+              annotationText: '弹窗打开时隐藏背景 marker，关闭后恢复。',
+              hasMarkdown: false,
+              color: '#0F766E',
+              images: [],
+              createdAt: 1779667200000,
+              updatedAt: 1779667200000,
+            },
+            {
+              id: 'modal-content-target',
+              index: 4,
+              title: '发布任务弹窗',
+              pageId: 'overview',
+              locator: {
+                selectors: ['[data-annotation-id="modal-content-target"]'],
+                fingerprint: 'section|modal-content-target',
+                path: [],
+              },
+              aiPrompt: '说明活动前景层内的标注。',
+              annotationText: '弹窗内容位于活动层根内，marker 保持可见。',
+              hasMarkdown: false,
+              color: '#E11D48',
+              images: [],
               createdAt: 1779667200000,
               updatedAt: 1779667200000,
             },
@@ -238,6 +307,18 @@
           renderPage(normalizePageId(button.dataset.route));
           viewer.refresh();
         });
+      });
+
+      const modalLayer = document.querySelector('.example-modal-layer');
+      document.querySelector('[data-modal-open]')?.addEventListener('click', () => {
+        modalLayer.hidden = false;
+        modalLayer.dataset.open = 'true';
+        viewer.refresh();
+      });
+      document.querySelector('[data-modal-close]')?.addEventListener('click', () => {
+        modalLayer.dataset.open = 'false';
+        modalLayer.hidden = true;
+        viewer.refresh();
       });
 
       void viewer.start().then(() => {

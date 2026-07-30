@@ -57,6 +57,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 - marker 只属于某些页面或状态时，写 `pageId`。
 - 长正文用 `hasMarkdown: true` + `markdownMap[node.id]`。
 - 状态标注写节点 `controls`；JSON 里只放可序列化字段。
+- 页面有对话框或遮罩层时，检查实际 DOM，把包含内容的活动层根选择器写入 `presentation.layerSelectors`。
 - `sourceReference` 不放在 JSON 数据源里，只描述发布包中的源码清单位置，不内联源码文件。
 
 ## 验收

@@ -35,6 +35,7 @@ function StateCard() {
 
 export function AnnotationStandaloneReactExample() {
   const [pageId, setPageId] = React.useState<PageId>('overview');
+  const [modalOpen, setModalOpen] = React.useState(false);
 
   const options = React.useMemo<AnnotationViewerOptions>(() => ({
     currentPageId: pageId,
@@ -54,13 +55,33 @@ export function AnnotationStandaloneReactExample() {
       </nav>
 
       {pageId === 'overview' ? (
-        <section data-annotation-id="overview-hero">
-          <h1>@axhub/annotation</h1>
-          <p>这是一个脱离平台的 React 接入示例。</p>
-        </section>
+        <>
+          <section data-annotation-id="overview-hero">
+            <h1>@axhub/annotation</h1>
+            <p>这是一个脱离平台的 React 接入示例。</p>
+          </section>
+          <button
+            type="button"
+            data-annotation-id="modal-background-target"
+            onClick={() => setModalOpen(true)}
+          >
+            新建发布任务
+          </button>
+        </>
       ) : (
         <StateCard />
       )}
+
+      <div
+        className="example-modal-layer"
+        data-open={modalOpen ? 'true' : 'false'}
+        hidden={!modalOpen}
+      >
+        <section role="dialog" aria-modal="true" data-annotation-id="modal-content-target">
+          <h2>新建发布任务</h2>
+          <button type="button" onClick={() => setModalOpen(false)}>关闭</button>
+        </section>
+      </div>
 
       <AnnotationViewer
         source={annotationSource as AnnotationSourceDocument}
