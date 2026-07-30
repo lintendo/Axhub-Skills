@@ -20,6 +20,8 @@
 
 这是默认方案，不修改项目配置，最适合一次性生成可批注地址。
 
+Figma 链接只追加 `projectPath`，不提前追加 Drafito 的 `try-plugin-*` 参数。Axhub 扩展会先持久化文件与目录的绑定，再启动插件；不要依赖 Figma 重定向后的 URL 保留工作目录。
+
 使用标准 `URL` API，在现有页面地址上设置定位参数，并保留已有 query 和 hash：
 
 ```ts

@@ -57,7 +57,9 @@ node "$skillDir/scripts/figwright-operator.mjs" call get_selection '{}'
 
 仅在服务器本地运行的 `analyze_project` 和 `scan_components` 不需要 Figma。其他映射工具会结合本地项目数据和实时 Figma 数据，因此需要端到端插件连接。
 
-## 可批注 Figma 链接
+## 批注 Figma
+
+涉及批注或可批注链接时，参考 [axhub-commentary](https://github.com/lintendo/Axhub-Skills/blob/main/skills/axhub-commentary/SKILL.md)。
 
 只在原始 Figma URL 上追加绝对 `projectPath`，不要预先追加 `try-plugin-*`。Axhub 扩展会先把目录绑定到稳定的 Figma 文件身份，确认写入后再自行启动 Drafito；Figma 重定向清除参数后，扩展从该绑定恢复目录。
 

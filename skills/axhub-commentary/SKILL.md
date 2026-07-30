@@ -1,6 +1,6 @@
 ---
 name: axhub-commentary
-description: 处理 Axhub Commentary 完整工作流。优先读取本地页面批注文档，落实修改并更新批注状态，或在用户确认后写入删除标记；本地读取失败时再确认 ACP UI 并生成临时可批注地址。也可为已接入 @axhub/annotation 的页面准备标注编辑环境，或配置 AI 侧边栏对话、AI 批注执行、调整面板属性和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、可批注链接、comments.json、标注编辑按钮、修改标注内容、Annotation Runtime、annotationSourcePath、根据 Commentary 意见改代码、更新或清理批注、页面 AI、供应商安装登录、调整面板、方案切换或页面定位信息时使用。
+description: 处理 Axhub Commentary 完整工作流。优先读取本地页面批注文档，落实修改并更新批注状态，或在用户确认后写入删除标记；本地读取失败时再确认 ACP UI 并生成临时可批注地址。也可为已接入 @axhub/annotation 的页面准备标注编辑环境，或配置 AI 侧边栏对话、AI 批注执行、调整面板属性和多方案比稿。当用户提到 Axhub Commentary、Axhub Chrome 扩展页面批注、可批注链接、comments.json、标注编辑按钮、修改标注内容、Annotation Runtime、annotationSourcePath、根据 Commentary 意见改代码、更新或清理批注、页面 AI、供应商安装登录、调整面板、方案切换或页面定位信息时使用。可批注目标是 Figma 时，也应与 figma-content-operator 组合。
 ---
 
 # Axhub Commentary 工作流
@@ -27,6 +27,8 @@ Commentary 的 AI 对话、AI 批注执行、provider session、宿主资源工�
 ### 2. 可批注地址与环境准备（主要）
 
 任务是生成可批注地址或确认页面定位时，读 `references/environment-context.md`。这里优先使用不改项目文件的临时链接方案；只有用户明确要求稳定入口时，才进入固定接入。
+
+Figma 是例外：最终链接只给原始 Figma URL 加绝对 `projectPath`，不加 `try-plugin-*`。扩展必须先按稳定文件身份完成绑定，再自行启动 Drafito。
 
 ### 3. Annotation 标注环境准备（主要）
 
