@@ -76,8 +76,26 @@ export function AnnotationStandaloneReactExample() {
         className="example-modal-layer"
         data-open={modalOpen ? 'true' : 'false'}
         hidden={!modalOpen}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1000,
+          display: modalOpen ? 'grid' : 'none',
+          placeItems: 'center',
+          background: 'rgba(17, 24, 39, 0.5)',
+        }}
       >
-        <section role="dialog" aria-modal="true" data-annotation-id="modal-content-target">
+        <section
+          role="dialog"
+          aria-modal="true"
+          data-annotation-id="modal-content-target"
+          style={{
+            width: 'min(420px, calc(100% - 32px))',
+            padding: 24,
+            borderRadius: 8,
+            background: '#ffffff',
+          }}
+        >
           <h2>新建发布任务</h2>
           <button type="button" onClick={() => setModalOpen(false)}>关闭</button>
         </section>
