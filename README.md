@@ -1,46 +1,253 @@
 # Axhub AI Skills
 
-**Axhub AI Skills** Axhub 出品的 AI Skills 合集
+Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原型、页面、用户反馈与设计稿交给 AI 理解并继续完成工作。
 
-## 🌟 核心技能
+> 建议每次只安装当前任务需要的一个技能。先从总览找到合适的技能，再查看对应的使用场景和安装提示词。
 
-目前图谱中集成了以下高度包装的 AI 技能包，涵盖了从网页内容解析、设计体系提取到原型平台双向转换的全生命周期：
+## 技能总览
 
-| 技能名称 | 一句话能力简介 | 典型魔法召唤场景 |
-|---------|-----------|-------------|
-| **`china-customer-research`** | **中国、海外与跨市场客户研究路由器** | *“调研这个产品的客户需求，先判断是中国限定、海外限定还是国内外并行，再从合适的平台提取 VOC、JTBD 和需求证据。”* |
-| **`axhub-annotation-standalone`** | **独立页面标注运行时接入器** | *“把这份 Axhub 标注数据接到普通 HTML / React / Vite 页面里，直接显示 marker、目录、Markdown 标注和状态控件。”* |
-| **`axhub-prototype-context`** | **Axhub 原型上下文读取器** | *“打开这个 Axhub 原型链接，帮我读取 PRD 目录、页面标注、源码交接信息，并在需要时回传评审报告。”* |
-| **`clone-page`** | **高精度网页逐级克隆器** | *“参考这个在线 URL，利用 Playwright 帮我 1:1 抓取并还原一个一模一样的静态页面结构。”* |
-| **`extract-axure-data`** | **Axure 宇宙解析器** | *“分析这个 Axure 原型链接，深入提取它的精确截图、设计 Token、交互地图和所有的设计标注信息。”* |
-| **`extract-page-data`** | **通用网页深度 X 光机** | *“打开这个页面，帮我输出长截图、提取页面视觉色板代码，并把文案骨架直接转成 Markdown。”* |
-| **`generate-theme`** | **设计系统自动发电机** | *“分析特定页面的视觉风格，直接生成能够用于开发的 `DESIGN.md` 设计体系规范和 Tailwind v4 主题文件。”* |
-| **`axhub-commentary`** | **Commentary 完整工作流** | *“读取 Axhub Chrome 页面批注、完成改稿和任务清理，也可以开启 Annotation 标注编辑环境，让用户直接创建或修改页面标注内容。”* |
-| **`figma-content-operator`** | **Figma 内容操作器** | *“读取或修改当前 Figma 设计，导出内容，并把设计与项目代码关联起来。”* |
-| **`git-repo-beginner-guide`** | **Git 仓库新手协作向导** | *“我不熟 Git，帮我把这个项目安全提交到 GitHub / GitLab，并告诉我哪些地方需要确认授权或处理冲突。”* |
-| **`react-to-figma-make`** | **Figma Make 离线铸造师** | *“这个 React 项目开发完了，帮我逆向转换为 Figma Make 项目格式，并打包出可直接扔进 Figma 客户端呈现的 `.fig` 二进制文件。”* |
-| **`mcp-installer`** | **上下文协议 (MCP) 极速装配** | *“这里有一个提供服务的工具包，帮我自动化一键将这套 MCP 协议安装并兼容配置到当前主控的 AI IDE 中。”* |
+| 技能 | 一句话用途 |
+| --- | --- |
+| [`axhub-annotation-standalone`](#axhub-annotation-standalone) | 让原型同时展示页面标注、PRD 目录和说明文档 |
+| [`axhub-prototype-context`](#axhub-prototype-context) | 让 AI 读取带标注原型的页面、PRD、标注和源码 |
+| [`extract-axure-data`](#extract-axure-data) | 读取 Axure 原型的页面、交互、标注和视觉信息 |
+| [`generate-theme`](#generate-theme) | 把参考页面整理成可复用的设计规范和项目主题 |
+| [`axhub-commentary`](#axhub-commentary) | 读取页面批注、完成修改并同步处理状态 |
+| [`figma-content-operator`](#figma-content-operator) | 让 AI 读取、修改、导出 Figma 内容并关联项目代码 |
+| [`extract-page-data`](#extract-page-data) | 把普通网页整理成截图、文案、颜色、字体和链接资料 |
+| [`clone-page`](#clone-page) | 根据参考网页还原一个可以继续修改和开发的页面 |
+| [`china-customer-research`](#china-customer-research) | 从真实用户反馈中找到需求、动机和决策依据 |
+| [`react-to-figma-make`](#react-to-figma-make) | 把已有产品页面转换为 Figma Make 可继续编辑的文件 |
+| [`mcp-installer`](#mcp-installer) | 把 AI 需要使用的外部工具接入当前客户端 |
+| [`git-repo-beginner-guide`](#git-repo-beginner-guide) | 帮助不熟悉 Git 的用户安全保存、同步和恢复项目 |
 
-## 🔧 安装与获取
+## 技能说明
 
-### 方式一：直接对 AI 下达指令
+<a id="axhub-annotation-standalone"></a>
+### `axhub-annotation-standalone`：在原型中展示标注和 PRD
 
-在任何支持网络读取的 AI IDE（如 Cursor / Windsurf / Trae 等）中，直接向 AI 输入以下自然语言提示词：
+**遇到的问题 / 适用场景**
+
+- 希望用可交互原型代替传统 PRD，让页面和需求说明放在一起。
+- 分享原型时，希望其他人能同步看到页面目录、PRD 文档和具体位置的标注。
+- 原型有多个页面或状态，希望查看者可以跟着标注切换并理解完整流程。
+
+**解决方法**
+
+使用 `axhub-annotation-standalone`，把已有的目录、PRD 和页面标注展示在原型中，让查看者边操作边理解需求。
+
+**安装提示词**
 
 ```text
-请帮我安装这个技能合集 https://github.com/lintendo/Axhub-Skills/
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/axhub-annotation-standalone 安装 axhub-annotation-standalone 这个技能。
 ```
 
-### 方式二：命令行安装
+<a id="axhub-prototype-context"></a>
+### `axhub-prototype-context`：读取带标注的原型
 
-通过技能包管理工具直接安装：
+**遇到的问题 / 适用场景**
 
-```bash
-npx skills add https://github.com/lintendo/Axhub-Skills/
+- 拿到一个带标注的原型链接，希望 AI 不只看截图，还能理解页面目录、PRD 和每条标注。
+- 希望 AI 同时读取原型对应的源码，了解设计与现有实现之间的关系。
+- 原型已经说明清楚需求，希望 AI Agent 继续完成评审、开发计划或生产环境实现。
+
+**解决方法**
+
+使用 `axhub-prototype-context`，读取原型公开的页面、PRD、标注和源码信息，并把这些内容作为 AI Agent 后续工作的完整上下文。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/axhub-prototype-context 安装 axhub-prototype-context 这个技能。
 ```
 
-> **💡 最佳实践建议**
-> 
-> **请勿盲目安装整个合集！**
-> 1. **按需引入**：建议针对性地只挑取当前任务所需的独立技能（例如明确指定对应子目录），以免过多的上下文挤占 Token 空间。
-> 2. **局部优先**：建议优先将技能安装到当前项目的局部目录（非全局环境），这能确保团队不同工程之间的环境隔离。
+<a id="extract-axure-data"></a>
+### `extract-axure-data`：读取 Axure 原型
+
+**遇到的问题 / 适用场景**
+
+- 手上只有一个 Axure 原型链接，希望 AI 理解其中有哪些页面和完整流程。
+- 需要整理原型中的页面截图、交互效果、设计标注和文案。
+- 希望依据现有 Axure 原型继续做评审、改版，或把它实现成真正的产品页面。
+
+**解决方法**
+
+使用 `extract-axure-data`，把 Axure 原型中的页面、交互、标注、文案和视觉信息整理成 AI 可以继续使用的资料。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/extract-axure-data 安装 extract-axure-data 这个技能。
+```
+
+<a id="generate-theme"></a>
+### `generate-theme`：从参考页面生成设计规范
+
+**遇到的问题 / 适用场景**
+
+- 找到了喜欢的参考页面，但没有现成的颜色、字体、间距和组件规范。
+- 希望新页面保持统一风格，避免不同页面看起来像来自不同产品。
+- 需要一份设计师能检查、研发和 AI 能直接使用的设计规范。
+
+**解决方法**
+
+使用 `generate-theme`，分析参考页面的视觉规律，生成 `DESIGN.md` 设计规范和可以直接用于项目的 Tailwind v4 主题。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/generate-theme 安装 generate-theme 这个技能。
+```
+
+<a id="axhub-commentary"></a>
+### `axhub-commentary`：根据页面批注完成改稿
+
+**遇到的问题 / 适用场景**
+
+- 页面已经收到 Axhub Commentary 批注，希望 AI 按意见直接完成修改。
+- 批注较多，需要知道哪些已经处理、哪些仍需确认，并保持状态同步。
+- 希望在页面上继续添加或修改标注，或比较多个调整方案。
+
+**解决方法**
+
+使用 `axhub-commentary`，读取页面批注、完成对应修改并更新处理状态，也可以继续准备可批注页面和标注编辑环境。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/axhub-commentary 安装 axhub-commentary 这个技能。
+```
+
+<a id="figma-content-operator"></a>
+### `figma-content-operator`：让 AI 操作 Figma 内容
+
+**遇到的问题 / 适用场景**
+
+- 希望 AI 看懂当前选中的 Figma 图层、文字、颜色、布局和组件关系。
+- 需要批量修改文字、样式、变量或页面内容，并在修改后检查结果。
+- 希望导出图片、PDF 或设计资料，或把 Figma 设计与现有项目代码对应起来。
+- Figma 文件需要生成可批注链接，并关联当前项目目录。
+
+**解决方法**
+
+使用 `figma-content-operator`，让 AI 按当前任务读取、修改和导出 Figma 内容；需要页面批注时可与 `axhub-commentary` 一起使用。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/figma-content-operator 安装 figma-content-operator 这个技能。
+```
+
+<a id="extract-page-data"></a>
+### `extract-page-data`：整理网页内容和视觉资料
+
+**遇到的问题 / 适用场景**
+
+- 手上只有一个网页链接，希望完整保存页面或某个区域的画面。
+- 需要整理页面使用的颜色、字体、文案、链接和可点击内容。
+- 希望把网页快速转成便于分析、汇报或继续开发的资料包。
+
+**解决方法**
+
+使用 `extract-page-data`，从普通网页中提取截图、视觉风格、页面文案和链接，并按任务需要整理输出。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/extract-page-data 安装 extract-page-data 这个技能。
+```
+
+<a id="clone-page"></a>
+### `clone-page`：还原参考网页
+
+**遇到的问题 / 适用场景**
+
+- 想参考一个现有网页快速制作自己的页面，不希望从空白开始。
+- 参考页面在电脑和手机上有不同布局，或包含悬停、点击等状态。
+- 希望保留页面中的图片、字体和图标，并逐步检查还原效果。
+
+**解决方法**
+
+使用 `clone-page`，分析参考网页的内容、布局、不同尺寸和交互状态，再还原成可以继续修改和开发的页面。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/clone-page 安装 clone-page 这个技能。
+```
+
+<a id="china-customer-research"></a>
+### `china-customer-research`：从用户反馈中发现需求
+
+**遇到的问题 / 适用场景**
+
+- 有很多访谈、问卷、工单、社区帖子或评论，不知道用户真正关心什么。
+- 需要理解用户为什么购买、持续使用或放弃产品。
+- 希望比较中国、海外或不同市场的用户需求，为产品决策和 PRD 找到证据。
+
+**解决方法**
+
+使用 `china-customer-research`，根据研究市场整理真实用户反馈，归纳核心需求、使用动机和可以追溯的产品依据。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/china-customer-research 安装 china-customer-research 这个技能。
+```
+
+<a id="react-to-figma-make"></a>
+### `react-to-figma-make`：把产品页面带回 Figma Make
+
+**遇到的问题 / 适用场景**
+
+- 已经有一个可以运行的产品页面，希望在 Figma Make 中继续编辑、演示或迭代。
+- 页面已经更新，希望设计文件中的代码、图片和其他资源也保持同步。
+- 需要生成可以直接导入 Figma Make 的 `.fig` 文件，并确认导入后能够正常使用。
+
+**解决方法**
+
+使用 `react-to-figma-make`，把现有产品页面及其资源整理为 Figma Make 可导入、可继续编辑的 `.fig` 文件。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/react-to-figma-make 安装 react-to-figma-make 这个技能。
+```
+
+<a id="mcp-installer"></a>
+### `mcp-installer`：为 AI 接入外部工具
+
+**遇到的问题 / 适用场景**
+
+- 想让当前 AI 客户端使用一个外部工具，但不知道应该安装到哪里。
+- 更换电脑、系统或 AI 客户端后，原来的工具配置无法直接使用。
+- 自动安装失败，需要在不破坏现有配置的情况下完成接入。
+
+**解决方法**
+
+使用 `mcp-installer`，识别当前系统和 AI 客户端，选择合适的方式安装 MCP 服务并保留已有配置。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/mcp-installer 安装 mcp-installer 这个技能。
+```
+
+<a id="git-repo-beginner-guide"></a>
+### `git-repo-beginner-guide`：安全保存和同步项目
+
+**遇到的问题 / 适用场景**
+
+- 第一次把项目保存到 GitHub、GitLab、Gitee 等平台，不知道从哪里开始。
+- 需要提交、下载或同步团队改动，但担心覆盖别人或丢失自己的内容。
+- 遇到冲突、误操作或错误版本，希望有人逐步说明并帮助恢复。
+
+**解决方法**
+
+使用 `git-repo-beginner-guide`，通过逐步确认完成项目保存、同步、冲突处理和版本恢复，重要操作不会在未确认时执行。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/git-repo-beginner-guide 安装 git-repo-beginner-guide 这个技能。
+```

@@ -5,32 +5,50 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
-const referencePaths = [
+const referencePath = path.resolve(
+  testDir,
   '../skills/axhub-prototype-context/references/review-report-submission.md',
-  '../skills/extract-annotation-source/references/review-report-submission.md',
-].map((relativePath) => path.resolve(testDir, relativePath));
-const referenceSources = referencePaths.map((referencePath) => readFileSync(referencePath, 'utf8'));
+);
+const referenceSource = readFileSync(referencePath, 'utf8');
+const prototypeSkillPath = path.resolve(
+  testDir,
+  '../skills/axhub-prototype-context/SKILL.md',
+);
+const annotationRuntimePath = path.resolve(
+  testDir,
+  '../skills/axhub-annotation-standalone/references/axhub-annotation.global.js',
+);
 
-test('keeps review submission guidance identical across independently installable skills', () => {
-  assert.equal(referenceSources[0], referenceSources[1]);
+test('axhub-prototype-context uses the injected review context as the channel-agnostic submission contract', () => {
+  assert.match(referenceSource, /唯一事实来源/u);
+  assert.match(referenceSource, /不识别或区分局域网与 Axhub/u);
+  assert.match(referenceSource, /submitContext\.url/u);
+  assert.match(referenceSource, /submitContext\.existsUrl/u);
+  assert.match(referenceSource, /report\.id/u);
+  assert.match(referenceSource, /"title":/u);
+  assert.match(referenceSource, /"reviewer":/u);
+  assert.match(referenceSource, /"score":/u);
+  assert.match(referenceSource, /"content":/u);
+  assert.match(referenceSource, /"source":/u);
+  assert.doesNotMatch(referenceSource, /lan-submit-config/u);
+  assert.doesNotMatch(referenceSource, /Axhub Make LAN\/admin origin/u);
+  assert.doesNotMatch(referenceSource, /POST <window\.__AXHUB_REVIEW_SUBMIT__\.url or/u);
 });
 
-for (const [index, referencePath] of referencePaths.entries()) {
-  test(`${path.basename(path.dirname(path.dirname(referencePath)))} uses the injected review context as the channel-agnostic submission contract`, () => {
-    const source = referenceSources[index];
+test('axhub-prototype-context gives an AI Agent generic annotated prototype context', () => {
+  const skillSource = readFileSync(prototypeSkillPath, 'utf8');
 
-    assert.match(source, /唯一事实来源/u);
-    assert.match(source, /不识别或区分局域网与 Axhub/u);
-    assert.match(source, /submitContext\.url/u);
-    assert.match(source, /submitContext\.existsUrl/u);
-    assert.match(source, /report\.id/u);
-    assert.match(source, /"title":/u);
-    assert.match(source, /"reviewer":/u);
-    assert.match(source, /"score":/u);
-    assert.match(source, /"content":/u);
-    assert.match(source, /"source":/u);
-    assert.doesNotMatch(source, /lan-submit-config/u);
-    assert.doesNotMatch(source, /Axhub Make LAN\/admin origin/u);
-    assert.doesNotMatch(source, /POST <window\.__AXHUB_REVIEW_SUBMIT__\.url or/u);
-  });
-}
+  assert.match(skillSource, /^# Annotated Prototype Context$/mu);
+  assert.match(skillSource, /AI Agent/u);
+  assert.match(skillSource, /annotated prototype URL/u);
+  assert.doesNotMatch(skillSource, /AI Engine/u);
+  assert.doesNotMatch(skillSource, /an Axhub prototype URL/u);
+});
+
+test('annotation runtime installs axhub-prototype-context as the single prototype reader', () => {
+  const runtimeSource = readFileSync(annotationRuntimePath, 'utf8');
+
+  assert.match(runtimeSource, /skills\/axhub-prototype-context\/SKILL\.md/u);
+  assert.match(runtimeSource, /\$axhub-prototype-context/u);
+  assert.doesNotMatch(runtimeSource, /extract-annotation-source/u);
+});
