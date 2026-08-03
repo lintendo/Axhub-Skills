@@ -4,7 +4,7 @@
 
 - 使用浏览器中实际渲染的页面。React、Vue 等项目先启动开发服务器并传入 URL。
 - 运行 `scripts/webpage-to-figma.mjs`；该流程写入 Figma HTML 剪贴板，不通过 MCP 创建节点。
-- 默认使用 Axhub 自有 `axhub-export-core` H2D 实现。
+- 默认使用随技能发布的 H2D 运行时。
 - 写入会覆盖当前剪贴板，执行前提醒用户先处理其中的重要内容。
 - Figma 官方 `capture.js` 不随技能内置；用户明确提供链接时才下载到技能的 `.cache` 目录，后续使用 `--official-script cached`。
 

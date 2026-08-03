@@ -44,9 +44,6 @@ const run = (...args) =>
 test('publishes the generic Figma skill name consistently', () => {
   const skill = readFileSync(resolve(skillDir, 'SKILL.md'), 'utf8');
   const source = readFileSync(scriptPath, 'utf8');
-  const evals = JSON.parse(
-    readFileSync(resolve(skillDir, 'evals/evals.json'), 'utf8'),
-  );
   const interfaceMetadata = readFileSync(
     resolve(skillDir, 'agents/openai.yaml'),
     'utf8',
@@ -59,7 +56,6 @@ test('publishes the generic Figma skill name consistently', () => {
     /^description: 用于处理涉及检查、读取、创建、编辑、导出或代码映射的 Figma 内容任务/mu,
   );
   assert.match(skill, /^# Figma 内容操作器$/mu);
-  assert.equal(evals.skill_name, skillName);
   assert.match(readme, /`figma-content-operator`/u);
   assert.doesNotMatch(readme, /`figwright-mcp-operator`/u);
   assert.match(interfaceMetadata, /display_name: "Figma 内容操作器"/u);
@@ -68,7 +64,7 @@ test('publishes the generic Figma skill name consistently', () => {
   assert.doesNotMatch(source, /Figwright MCP Operator/u);
 });
 
-test('localizes all user-facing Skill guidance and evaluation text to Chinese', () => {
+test('localizes all user-facing Skill guidance and metadata to Chinese', () => {
   const chineseText = /[\u3400-\u9fff]/u;
   for (const relativePath of localizedMarkdownPaths) {
     const contents = readFileSync(resolve(skillDir, relativePath), 'utf8');
@@ -81,16 +77,6 @@ test('localizes all user-facing Skill guidance and evaluation text to Chinese', 
   );
   assert.match(interfaceMetadata, /short_description: "[^"]*[\u3400-\u9fff][^"]*"/u);
   assert.match(interfaceMetadata, /default_prompt: "[^"]*[\u3400-\u9fff][^"]*"/u);
-
-  const evals = JSON.parse(
-    readFileSync(resolve(skillDir, 'evals/evals.json'), 'utf8'),
-  );
-  for (const evaluation of evals.evals) {
-    assert.match(evaluation.expected_output, chineseText);
-    for (const expectation of evaluation.expectations) {
-      assert.match(expectation, chineseText);
-    }
-  }
 
   const help = run('--help');
   assert.equal(help.status, 0, help.stderr);
@@ -445,7 +431,6 @@ test('omits unreleased Drafito compatibility and obsolete local prerequisites', 
     'references/design-systems-and-advanced.md',
     'references/setup-and-connect.md',
     'references/troubleshooting-and-security.md',
-    'evals/evals.json',
     'scripts/figwright-operator.mjs',
   ];
   const corpus = paths
@@ -485,18 +470,6 @@ test('indexes all 104 pinned tools exactly once with progressive references', ()
       assert.match(compactReference, new RegExp(`\\b${tool}\\b`, 'u'));
     }
   }
-});
-
-test('covers the published inspect, edit, export, and grounding capabilities in evals', () => {
-  const evals = JSON.parse(
-    readFileSync(resolve(skillDir, 'evals/evals.json'), 'utf8'),
-  );
-  const corpus = JSON.stringify(evals.evals);
-
-  assert.match(corpus, /get_selection/u);
-  assert.match(corpus, /set_text/u);
-  assert.match(corpus, /save_screenshots|save_image_fills|export_pdf/u);
-  assert.match(corpus, /analyze_project|scan_components|component_map|token_map/u);
 });
 
 test('documents compact tool discovery and IPv4 loopback diagnosis', () => {
@@ -580,7 +553,7 @@ test('ships a focused official clipboard runtime without Figwright writes', () =
   const script = readFileSync(webpageToFigmaScriptPath, 'utf8');
 
   assert.equal(existsSync(runtimePath), true);
-  assert.match(runtime, /Axhub-owned axhub-export-core official Figma clipboard capture/u);
+  assert.match(runtime, /^\/\* Bundled Figma clipboard capture runtime\. \*\//u);
   assert.match(runtime, /__AXHUB_WEBPAGE_TO_FIGMA__/u);
   assert.match(runtime, /serialize:/u);
   assert.match(runtime, /figh2d/u);

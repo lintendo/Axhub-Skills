@@ -65,7 +65,7 @@ description: "Use when 需要把现有 React、Vite、Next.js、V0 或 AI Studio
 2. **canvas.fig 生成与验证**：本技能内置了相关的操作脚本，位于技能自身的目录下：
    - `scripts/canvas-fig-sync.mjs`：canvas.fig 回写与检查工具
    - `assets/empty-canvas.fig`：空白 canvas 模板
-   - 脚本运行依赖 `pako` 和 `kiwi-schema`。先直接运行一次；如果出现 `ERR_MODULE_NOT_FOUND`，在脚本所属包中按宿主项目规定的包管理器安装依赖。Axhub Runtime 仓库内必须使用 `pnpm`，不要向目标原型的运行时依赖中添加这两个包。
+   - 脚本运行依赖 `pako` 和 `kiwi-schema`。先直接运行一次；如果出现 `ERR_MODULE_NOT_FOUND`，在脚本所属包中按宿主项目规定的包管理器安装依赖，不要向目标原型的运行时依赖中添加这两个包。
 
 如果有额外的页面渲染验收脚本，也可以在此阶段执行。
 
