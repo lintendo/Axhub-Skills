@@ -14,3 +14,8 @@
 | `batch` | 以原子方式执行受支持的可逆写入，失败时回滚。 |
 
 页面导航、重命名或删除前读取 `get_pages`。组合操作前检查 `batch` schema；破坏性或不可逆工具会被主动拒绝，必须单独处理。
+
+```bash
+node "$SKILL_DIR/scripts/figwright-operator.mjs" schema batch
+node "$SKILL_DIR/scripts/figwright-operator.mjs" call batch @/absolute/path/to/ops.json
+```

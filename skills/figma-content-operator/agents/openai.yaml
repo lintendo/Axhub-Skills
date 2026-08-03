@@ -1,4 +1,4 @@
 interface:
   display_name: "Figma 内容操作器"
-  short_description: "通过 CLI 检查、编辑、导出并映射 Figma 内容。"
-  default_prompt: "使用 $figma-content-operator，通过限定范围的 CLI 调用检查或修改当前 Figma 设计。"
+  short_description: "复制网页到 Figma，或检查、编辑和导出画布内容。"
+  default_prompt: "使用 $figma-content-operator，先判断网页生成或画布修改路径，再完成限定范围的 Figma 操作。"

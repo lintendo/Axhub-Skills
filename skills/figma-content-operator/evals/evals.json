@@ -70,6 +70,76 @@
         "检查设计与代码两侧之后才使用 component_map 或 token_map",
         "区分显式绑定与基于值推断的匹配"
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "这个 React 页面已经在 http://localhost:5173 跑起来了，帮我准备好复制到 Figma，我自己去目标文件粘贴。",
+      "expected_output": "把 React 视为已渲染网页，调用 scripts/webpage-to-figma.mjs 将官方 H2D 数据写入系统剪贴板，不启动 Relay 或通过 MCP 创建节点；成功后明确请用户在 Figma 中粘贴。",
+      "files": [],
+      "expectations": [
+        "把 HTML、React、Vue 统一按已渲染网页处理",
+        "调用 scripts/webpage-to-figma.mjs",
+        "剪贴板路径不启动 Relay 或调用 MCP",
+        "不声称剪贴板成功等于 Figma 画布已修改"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "帮我设计一个新的 SaaS 账单管理页，后面还要适配手机，但我还没决定是先写 React 还是直接放到 Figma。",
+      "expected_output": "先询问用户选择生成网页还是直接修改 Figma，并明确推荐完整页面、响应式和多状态场景先生成可运行网页；不在用户选择前擅自启动 MCP。",
+      "files": [],
+      "expectations": [
+        "在交付路径不明确时先咨询用户",
+        "同时给出网页优先的具体推荐理由",
+        "把 React 作为网页实现选项而不是独立导入协议",
+        "用户选择前不启动 MCP 或声称已修改画布"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "这个 Vue 页面自动写入剪贴板失败了。我装过 Axhub 扩展，还有别的办法吗？",
+      "expected_output": "提供目标网页链接并引导用户通过 Axhub 扩展的“复制到 Figma”操作完成复制，同时给出 https://axhub.im/chrome/；没有扩展时使用脚本注入的复制按钮，不退回 MCP 批量创建节点。",
+      "files": [],
+      "expectations": [
+        "提供 Axhub 扩展安装链接和目标网页链接",
+        "说明可以使用页面内复制按钮",
+        "不退回旧的本地节点转换或 MCP 写入"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "把当前选中卡片的圆角改成 12，复用现有变量，并确认修改成功。",
+      "expected_output": "不重新导入整页，继续使用现有 Figwright 原生节点读取、限定写入和聚焦验证流程。",
+      "files": [],
+      "expectations": [
+        "选择 Figma-native 局部修改路径",
+        "先读取目标节点和相关变量",
+        "使用限定的 Figwright 写入并验证"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "页面在 http://localhost:4173，Figma 官方给了我 https://mcp.figma.com/mcp/html-to-design/capture.js。用这个脚本帮我准备剪贴板，之后也要能继续用。",
+      "expected_output": "仅因用户明确提供官方链接才下载 capture.js 到技能内的本地缓存并注入页面，使用官方页面按钮或剪贴板流程，不通过 MCP 提交；后续使用 cached 复用，最后让用户自行粘贴到 Figma。",
+      "files": [],
+      "expectations": [
+        "只有用户明确提供官方链接时才下载脚本",
+        "把官方脚本缓存到技能目录并支持 cached 复用",
+        "使用官方脚本自己的页面按钮或剪贴板流程",
+        "不通过 MCP 提交且不声称画布已修改"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "这个官网页面有四张大图，复制到 Figma 后图片全没了，但脚本还说成功。帮我重新处理，不能为了剪贴板体积把图删掉。",
+      "expected_output": "使用网页剪贴板脚本重新捕获，检查总资源数、已嵌入数和缺失数；大载荷保留全部成功序列化的图片，资源缺失时不报告成功，并优先使用用户已提供或已缓存的官方 capture.js。",
+      "files": [],
+      "expectations": [
+        "不设置会静默删除图片的剪贴板体积上限",
+        "检查 assetCount、embeddedAssetCount 和 missingAssetCount",
+        "资源缺失时不报告复制成功",
+        "图片较多时优先使用用户已提供或已缓存的官方脚本"
+      ]
     }
   ]
 }

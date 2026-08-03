@@ -10,6 +10,10 @@
 下载或修改任何内容前先运行 `doctor`。包装器通过 `npx` 调用 `@modelcontextprotocol/inspector@2.0.0`，后者再根据随附配置启动 `@figwright/mcp@0.3.0`。两者都无需全局安装，也不会向宿主代理添加 MCP 注册。
 在 Windows 上，包装器通过 `%ComSpec%`（通常为 `cmd.exe`）使用固定参数向量调用 `npx.cmd`。随附的 MCP 配置同样明确使用 `cmd.exe /d /s /c npx.cmd`，而不是尝试把 `.cmd` 文件当作原生可执行文件启动。
 
+```bash
+node "$SKILL_DIR/scripts/figwright-operator.mjs" doctor
+```
+
 对于依赖 Figma 的任务，先在独立进程中启动任务级 Relay，并保留该进程的准确句柄：
 
 ```bash
@@ -55,6 +59,11 @@ Inspector 工具调用仍是一次性的，但任务级 Relay 会在整个任务
 ## 成功标准
 
 不要把 MCP 服务器成功启动作为最终检查，因为这无法证明插件已经连通。本 Skill 会调用 Figwright 的 `ping` 工具，成功结果必须满足：
+
+```bash
+node "$SKILL_DIR/scripts/figwright-operator.mjs" ping
+node "$SKILL_DIR/scripts/figwright-operator.mjs" profile
+```
 
 ```json
 {

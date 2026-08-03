@@ -49,7 +49,12 @@
 本索引只是路由图，不是参数契约。每次调用前运行：
 
 ```bash
+node "$SKILL_DIR/scripts/figwright-operator.mjs" tools <keyword>
 node "$SKILL_DIR/scripts/figwright-operator.mjs" schema <exact-tool-name>
 ```
 
-如果未来固定的服务器版本改变工具目录，应运行 `catalog-check`，并同步更新本索引、领域参考、`assets/tool-index.json` 和测试。
+如果未来固定的服务器版本改变工具目录，应运行以下命令，并同步更新本索引、领域参考、`assets/tool-index.json` 和测试：
+
+```bash
+node "$SKILL_DIR/scripts/figwright-operator.mjs" catalog-check
+```

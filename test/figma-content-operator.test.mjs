@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -11,6 +11,7 @@ const appDir = resolve(testDir, '..');
 const skillName = 'figma-content-operator';
 const skillDir = resolve(appDir, `skills/${skillName}`);
 const scriptPath = resolve(skillDir, 'scripts/figwright-operator.mjs');
+const webpageToFigmaScriptPath = resolve(skillDir, 'scripts/webpage-to-figma.mjs');
 const configPath = resolve(skillDir, 'assets/figwright.mcp.json');
 const windowsConfigPath = resolve(skillDir, 'assets/figwright.windows.mcp.json');
 const toolIndexPath = resolve(skillDir, 'assets/tool-index.json');
@@ -23,6 +24,7 @@ const localizedMarkdownPaths = [
   'references/read-and-inspect.md',
   'references/setup-and-connect.md',
   'references/troubleshooting-and-security.md',
+  'references/webpage-to-figma.md',
   'references/tools/canvas-content.md',
   'references/tools/components-and-prototypes.md',
   'references/tools/export-and-grounding.md',
@@ -369,9 +371,9 @@ test('selects safe MCP launch commands and configs for each platform', async () 
     command: comSpec,
     args: ['/d', '/s', '/c', 'npx.cmd', '-y', '@figwright/mcp@0.3.0'],
   });
-  assert.match(skill, /^### Windows（PowerShell）$/mu);
-  assert.match(skill, /\$skillDir = \(Resolve-Path/u);
+  assert.doesNotMatch(skill, /^### Windows（PowerShell）$/mu);
   assert.match(setup, /npx\.cmd/u);
+  assert.match(setup, /figwright-operator\.mjs" doctor/u);
 });
 
 test('starts the task relay before presenting the Drafito launch link and cleans it up', () => {
@@ -497,16 +499,442 @@ test('covers the published inspect, edit, export, and grounding capabilities in 
   assert.match(corpus, /analyze_project|scan_components|component_map|token_map/u);
 });
 
-test('documents third-party positioning and IPv4 loopback diagnosis', () => {
+test('documents compact tool discovery and IPv4 loopback diagnosis', () => {
   const skill = readFileSync(resolve(skillDir, 'SKILL.md'), 'utf8');
+  const setup = readFileSync(
+    resolve(skillDir, 'references/setup-and-connect.md'),
+    'utf8',
+  );
+  const tools = readFileSync(toolReferencePath, 'utf8');
+  const batchTools = readFileSync(
+    resolve(skillDir, 'references/tools/pages-and-batch.md'),
+    'utf8',
+  );
   const troubleshooting = readFileSync(
     resolve(skillDir, 'references/troubleshooting-and-security.md'),
     'utf8',
   );
 
-  assert.match(skill, /第三方 Skill，并非 Figwright 官方 CLI/u);
   assert.match(skill, /references\/tools\/index\.md/u);
+  assert.doesNotMatch(skill, /^## 命令$|^## 固定版本$/mu);
+  assert.match(setup, /figwright-operator\.mjs" ping/u);
+  assert.match(setup, /figwright-operator\.mjs" profile/u);
+  assert.match(tools, /figwright-operator\.mjs" tools <keyword>/u);
+  assert.match(tools, /figwright-operator\.mjs" catalog-check/u);
+  assert.match(batchTools, /figwright-operator\.mjs" call batch @/u);
   assert.match(troubleshooting, /127\.0\.0\.1:3055/u);
   assert.match(troubleshooting, /localhost.*::1/su);
   assert.match(troubleshooting, /server-only/u);
+});
+
+test('routes rendered webpages to clipboard and explicit canvas edits to MCP', () => {
+  const skill = readFileSync(resolve(skillDir, 'SKILL.md'), 'utf8');
+  const grounding = readFileSync(
+    resolve(skillDir, 'references/grounding-workflows.md'),
+    'utf8',
+  );
+
+  assert.match(skill, /“网页”包括静态 HTML、React、Vue/u);
+  assert.match(skill, /先生成网页（HTML\/React\/Vue），还是直接修改 Figma 画布/u);
+  assert.match(skill, /明确要求修改当前画布、选区或已有节点时，直接走 Figwright MCP/u);
+  assert.match(skill, /references\/webpage-to-figma\.md/u);
+  assert.match(skill, /不启动 Relay 或调用 MCP/u);
+  assert.doesNotMatch(skill, /node "\$SKILL_DIR\/scripts\/webpage-to-figma\.mjs"/u);
+  assert.doesNotMatch(skill, /第三方 Skill，并非 Figwright 官方 CLI/u);
+  assert.doesNotMatch(skill, /clipboardHtmlVerified|embeddedAssetCount|missingAssetCount|--official-script|capture\.js/u);
+  const webpageReference = readFileSync(
+    resolve(skillDir, 'references/webpage-to-figma.md'),
+    'utf8',
+  );
+  assert.match(webpageReference, /scripts\/webpage-to-figma\.mjs/u);
+  assert.match(webpageReference, /--manual/u);
+  assert.match(webpageReference, /--official-script/u);
+  assert.match(webpageReference, /capture\.js/u);
+  assert.match(webpageReference, /https:\/\/axhub\.im\/chrome\//u);
+  assert.match(webpageReference, /不通过 MCP 创建节点/u);
+  assert.match(webpageReference, /覆盖当前剪贴板/u);
+  assert.match(webpageReference, /`\.cache` 目录/u);
+  assert.match(webpageReference, /clipboardHtmlVerified/u);
+  assert.match(webpageReference, /SHA-256/u);
+  assert.match(webpageReference, /assetCount.*embeddedAssetCount.*missingAssetCount/u);
+  assert.match(webpageReference, /页面上的复制按钮/u);
+  assert.match(webpageReference, /Cmd\/Ctrl\+V/u);
+  assert.match(grounding, /交付路径不明确时，先询问/u);
+  assert.match(grounding, /用户自行粘贴到目标文件/u);
+  assert.match(
+    grounding,
+    /新设计场景中选择直接生成 Figma 内容时，读取 <https:\/\/github\.com\/awdr74100\/figwright\/blob\/v0\.3\.0\/skills\/figma-build\/SKILL\.md>/u,
+  );
+  assert.match(grounding, /修改当前画布、选区或已有节点时.*不读取上述构建 Skill/u);
+  assert.doesNotMatch(grounding, /figma-codegen|如已安装|本 Skill 的 `call` 命令/u);
+  assert.doesNotMatch(skill, /figma-build/u);
+  assert.doesNotMatch(skill, /scripts\/html-to-figma\.mjs/u);
+});
+
+test('ships a focused official clipboard runtime without Figwright writes', () => {
+  const runtimePath = resolve(
+    skillDir,
+    'assets/webpage-to-figma-runtime.js',
+  );
+  const runtime = readFileSync(runtimePath, 'utf8');
+  const script = readFileSync(webpageToFigmaScriptPath, 'utf8');
+
+  assert.equal(existsSync(runtimePath), true);
+  assert.match(runtime, /Axhub-owned axhub-export-core official Figma clipboard capture/u);
+  assert.match(runtime, /__AXHUB_WEBPAGE_TO_FIGMA__/u);
+  assert.match(runtime, /serialize:/u);
+  assert.match(runtime, /figh2d/u);
+  assert.match(runtime, /ClipboardItem/u);
+  assert.match(runtime, /embeddedAssetCount/u);
+  assert.match(runtime, /missingAssetCount/u);
+  assert.doesNotMatch(runtime, /Figma size budget|clipboard limit|25e5/u);
+  assert.doesNotMatch(runtime, /callFigwrightTool|writeLayersToFigwright|figwright-operator/u);
+  assert.doesNotMatch(script, /callFigwrightTool|writeLayersToFigwright|figwright-operator/u);
+  assert.match(script, /pasteboard\.clearContents;/u);
+  assert.doesNotMatch(script, /pasteboard\.clearContents\(\)/u);
+  assert.doesNotMatch(script, /\/capture\/[^/]+\/submit|captureId:\s*['"]axhub-intercept/u);
+});
+
+test('validates webpage copy args and exposes the manual clipboard fallback', async () => {
+  const module = await import(pathToFileURL(webpageToFigmaScriptPath));
+  assert.deepEqual(
+    module.parseArgs([
+      '--source', 'http://localhost:5173',
+      '--selector', '#app',
+      '--timeout', '9000',
+      '--manual',
+    ]),
+    {
+      source: 'http://localhost:5173',
+      selector: '#app',
+      timeout: 9000,
+      manual: true,
+    },
+  );
+  assert.throws(() => module.parseArgs([]), /--source 是必填参数/u);
+  assert.throws(() => module.parseArgs(['--unknown']), /未知参数/u);
+  assert.deepEqual(
+    module.parseArgs([
+      '--source', 'http://localhost:5173',
+      '--official-script', 'https://mcp.figma.com/mcp/html-to-design/capture.js',
+    ]),
+    {
+      source: 'http://localhost:5173',
+      selector: 'body',
+      timeout: 60_000,
+      manual: false,
+      officialScript: 'https://mcp.figma.com/mcp/html-to-design/capture.js',
+    },
+  );
+
+  const fallback = module.buildFallbackButtonMarkup();
+  assert.match(fallback, /复制到 Figma/u);
+  assert.match(fallback, /https:\/\/axhub\.im\/chrome\//u);
+  assert.match(fallback, /__axhub_webpage_to_figma_copy__/u);
+  assert.deepEqual(
+    module.validateCaptureResult({
+      success: true,
+      assetCount: 4,
+      embeddedAssetCount: 4,
+      missingAssetCount: 0,
+    }),
+    {
+      success: true,
+      assetCount: 4,
+      embeddedAssetCount: 4,
+      missingAssetCount: 0,
+    },
+  );
+  assert.throws(
+    () => module.validateCaptureResult({
+      success: false,
+      assetCount: 4,
+      embeddedAssetCount: 3,
+      missingAssetCount: 1,
+    }),
+    /缺失 1 个/u,
+  );
+  const expectedHtml = Buffer.from('<span data-h2d="payload"></span>');
+  const nativeClipboardResult = module.writeMacOSClipboardHtml(
+    expectedHtml.toString('base64'),
+    {
+      platform: 'darwin',
+      execFile: (_command, _args, options) => {
+        writeFileSync(options.env.AXHUB_FIGMA_HTML_RESULT, readFileSync(options.env.AXHUB_FIGMA_HTML_SOURCE));
+      },
+    },
+  );
+  assert.deepEqual(nativeClipboardResult, {
+    supported: true,
+    clipboardWriter: 'macos-native',
+    expectedBytes: expectedHtml.byteLength,
+    actualBytes: expectedHtml.byteLength,
+    payloadDigestMatch: true,
+    clipboardHtmlVerified: true,
+  });
+  const mismatchedHtml = Buffer.from('<span data-h2d="other"></span>');
+  assert.deepEqual(
+    module.verifyClipboardPayload(expectedHtml, mismatchedHtml),
+    {
+      expectedBytes: expectedHtml.byteLength,
+      actualBytes: mismatchedHtml.byteLength,
+      payloadDigestMatch: false,
+      clipboardHtmlVerified: false,
+    },
+  );
+});
+
+test('downloads an explicitly supplied official script into the Skill cache once', async (context) => {
+  const module = await import(pathToFileURL(webpageToFigmaScriptPath));
+  const cacheDir = mkdtempSync(join(tmpdir(), 'figma-official-script-'));
+  const sourceUrl = 'https://mcp.figma.com/mcp/html-to-design/capture.js';
+  const officialSource = 'window.figma = { captureForDesign: async () => ({ success: true }) };' +
+    '/* official capture fixture */'.repeat(12);
+  let fetchCount = 0;
+  context.after(() => rmSync(cacheDir, { recursive: true, force: true }));
+
+  const first = await module.resolveOfficialScript(sourceUrl, {
+    officialScriptCacheDir: cacheDir,
+    fetch: async () => {
+      fetchCount += 1;
+      return { ok: true, status: 200, text: async () => officialSource };
+    },
+  });
+  const second = await module.resolveOfficialScript(sourceUrl, {
+    officialScriptCacheDir: cacheDir,
+    fetch: async () => assert.fail('the matching cached URL must not be downloaded again'),
+  });
+  const cached = await module.resolveOfficialScript('cached', {
+    officialScriptCacheDir: cacheDir,
+  });
+
+  assert.equal(fetchCount, 1);
+  assert.equal(first.downloaded, true);
+  assert.equal(second.downloaded, false);
+  assert.equal(cached.downloaded, false);
+  assert.equal(first.path, join(cacheDir, 'capture.js'));
+  assert.equal(readFileSync(first.path, 'utf8'), officialSource);
+  assert.equal(second.path, first.path);
+  assert.equal(cached.path, first.path);
+});
+
+test('copies a rendered page without launching Figwright or MCP', async () => {
+  const module = await import(pathToFileURL(webpageToFigmaScriptPath));
+  const calls = [];
+  const page = {
+    goto: async (url) => calls.push(['goto', url]),
+    addScriptTag: async ({ path }) => calls.push(['runtime', path]),
+    evaluate: async (callback) => {
+      if (String(callback).includes('runtime.copy')) {
+        return {
+          success: true,
+          payloadSizeKb: 12,
+          assetCount: 4,
+          embeddedAssetCount: 4,
+          missingAssetCount: 0,
+        };
+      }
+      return undefined;
+    },
+  };
+  const context = {
+    grantPermissions: async (permissions) => calls.push(['permissions', permissions]),
+    newPage: async () => page,
+    close: async () => calls.push(['context-close']),
+  };
+  const browser = {
+    newContext: async () => context,
+    close: async () => calls.push(['browser-close']),
+  };
+  const playwright = {
+    chromium: {
+      launch: async (options) => {
+        calls.push(['launch', options]);
+        return browser;
+      },
+    },
+  };
+
+  const result = await module.run({
+    source: '<!doctype html><main>Invoice</main>',
+    selector: 'main',
+    timeout: 5_000,
+    manual: false,
+  }, { playwright, platform: 'linux' });
+
+  assert.equal(result.mode, 'clipboard');
+  assert.equal(result.interaction, 'automatic');
+  assert.equal(result.payloadSizeKb, 12);
+  assert.equal(result.assetCount, 4);
+  assert.equal(result.embeddedAssetCount, 4);
+  assert.equal(result.missingAssetCount, 0);
+  assert.equal(result.clipboardHtmlVerified, null);
+  const launchOptions = calls.find(([name]) => name === 'launch')[1];
+  assert.equal(launchOptions.headless, true);
+  assert.doesNotMatch(launchOptions.args.join(' '), /--no-sandbox/u);
+  assert.deepEqual(calls.find(([name]) => name === 'permissions')[1], [
+    'clipboard-read',
+    'clipboard-write',
+  ]);
+  assert.match(calls.find(([name]) => name === 'runtime')[1], /webpage-to-figma-runtime\.js$/u);
+  await assert.rejects(
+    module.run({
+      source: webpageToFigmaScriptPath,
+      selector: 'body',
+      timeout: 5_000,
+      manual: false,
+    }, { playwright }),
+    /本地源必须是 HTML 文件/u,
+  );
+});
+
+test('writes serialized H2D HTML through the native macOS clipboard path', async () => {
+  const module = await import(pathToFileURL(webpageToFigmaScriptPath));
+  const calls = [];
+  const htmlBytes = Buffer.from('<span data-h2d="payload"></span>');
+  const page = {
+    goto: async (url) => calls.push(['goto', url]),
+    addScriptTag: async ({ path }) => calls.push(['runtime', path]),
+    evaluate: async (callback) => {
+      if (String(callback).includes('runtime.serialize')) {
+        return {
+          success: true,
+          payloadSizeKb: 12,
+          assetCount: 4,
+          embeddedAssetCount: 4,
+          missingAssetCount: 0,
+          htmlBase64: htmlBytes.toString('base64'),
+        };
+      }
+      return undefined;
+    },
+  };
+  const context = {
+    grantPermissions: async () => {},
+    newPage: async () => page,
+    close: async () => calls.push(['context-close']),
+  };
+  const browser = {
+    newContext: async () => context,
+    close: async () => calls.push(['browser-close']),
+  };
+  const playwright = {
+    chromium: {
+      launch: async () => browser,
+    },
+  };
+
+  const result = await module.run({
+    source: '<!doctype html><main>Invoice</main>',
+    selector: 'main',
+    timeout: 5_000,
+    manual: false,
+  }, {
+    playwright,
+    platform: 'darwin',
+    execFile: (_command, _args, options) => {
+      writeFileSync(options.env.AXHUB_FIGMA_HTML_RESULT, readFileSync(options.env.AXHUB_FIGMA_HTML_SOURCE));
+    },
+  });
+
+  assert.equal(result.interaction, 'automatic');
+  assert.equal(result.method, 'axhub-runtime');
+  assert.equal(result.clipboardWriter, 'macos-native');
+  assert.equal(result.clipboardHtmlVerified, true);
+  assert.equal(result.payloadDigestMatch, true);
+  assert.equal(result.expectedBytes, htmlBytes.byteLength);
+  assert.equal(result.actualBytes, htmlBytes.byteLength);
+  assert.equal(calls.filter(([name]) => name === 'runtime').length, 1);
+});
+
+test('injects an explicitly supplied official script and uses its clipboard flow', async (context) => {
+  const module = await import(pathToFileURL(webpageToFigmaScriptPath));
+  const cacheDir = mkdtempSync(join(tmpdir(), 'figma-official-injection-'));
+  const officialSource = 'window.figma = { captureForDesign: async () => ({ success: true }) };' +
+    '/* official capture fixture */'.repeat(12);
+  const calls = [];
+  context.after(() => rmSync(cacheDir, { recursive: true, force: true }));
+
+  const page = {
+    goto: async (url) => calls.push(['goto', url]),
+    addScriptTag: async ({ path }) => calls.push(['script', path]),
+    evaluate: async (callback) => {
+      if (String(callback).includes('captureForDesign')) {
+        calls.push(['official-copy']);
+        return { success: true };
+      }
+      return undefined;
+    },
+  };
+  const contextState = {
+    grantPermissions: async () => {},
+    newPage: async () => page,
+    close: async () => {},
+  };
+  const playwright = {
+    chromium: {
+      launch: async () => ({
+        newContext: async () => contextState,
+        close: async () => {},
+      }),
+    },
+  };
+
+  const result = await module.run({
+    source: '<!doctype html><main>Invoice</main>',
+    selector: 'main',
+    timeout: 5_000,
+    manual: false,
+    officialScript: 'https://mcp.figma.com/mcp/html-to-design/capture.js',
+  }, {
+    playwright,
+    officialScriptCacheDir: cacheDir,
+    fetch: async () => ({ ok: true, status: 200, text: async () => officialSource }),
+  });
+
+  assert.equal(result.mode, 'clipboard');
+  assert.equal(result.method, 'official-script');
+  assert.equal(result.success, true);
+  assert.equal(calls.filter(([name]) => name === 'script').length, 2);
+  assert.match(calls.find(([name, path]) => name === 'script' && /capture\.js$/u.test(path))[1], /capture\.js$/u);
+  assert.equal(calls.filter(([name]) => name === 'official-copy').length, 1);
+  assert.match(String(module.copyFromOfficialPage), /__axhub_webpage_to_figma_fallback__/u);
+  assert.doesNotMatch(String(module.copyFromOfficialPage), /endpoint|captureId/u);
+});
+
+test('serves relative and root-relative assets for a local HTML page', async (context) => {
+  const module = await import(pathToFileURL(webpageToFigmaScriptPath));
+  const tempDir = mkdtempSync(join(tmpdir(), 'webpage-to-figma-source-'));
+  const htmlPath = join(tempDir, 'index.html');
+  const cssPath = join(tempDir, 'styles.css');
+  context.after(() => rmSync(tempDir, { recursive: true, force: true }));
+  writeFileSync(htmlPath, '<link rel="stylesheet" href="/styles.css"><main>Invoice</main>');
+  writeFileSync(cssPath, 'main { color: rgb(1, 2, 3); }');
+
+  const source = await module.prepareSource(htmlPath);
+  try {
+    const htmlResponse = await fetch(source.url);
+    const relativeCssResponse = await fetch(new URL('styles.css', source.url));
+    const rootCssResponse = await fetch(new URL('/styles.css', source.url));
+    assert.equal(htmlResponse.status, 200);
+    assert.equal(relativeCssResponse.status, 200);
+    assert.equal(rootCssResponse.status, 200);
+    assert.match(await rootCssResponse.text(), /rgb\(1, 2, 3\)/u);
+  } finally {
+    await source.close();
+  }
+});
+
+test('describes the webpage CLI and keeps React and Vue on rendered URLs', () => {
+  const result = spawnSync(process.execPath, [webpageToFigmaScriptPath, '--help'], {
+    cwd: appDir,
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /网页 → Figma 剪贴板（不使用 MCP）/u);
+  assert.match(result.stdout, /React\/Vue 等项目请先启动开发服务器/u);
+  assert.match(result.stdout, /--manual/u);
+  assert.match(result.stdout, /--official-script/u);
+  assert.match(result.stdout, /本技能的 \.cache 目录/u);
 });

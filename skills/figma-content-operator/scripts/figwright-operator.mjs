@@ -147,7 +147,9 @@ export function formatCallResult(result, imageArtifacts = []) {
 }
 
 export function isToolFailure(result) {
-  return result.payload?.isError === true || TOOL_ERROR_PATTERN.test(result.body);
+  return result.status !== undefined && result.status !== 0 ||
+    result.payload?.isError === true ||
+    TOOL_ERROR_PATTERN.test(result.body);
 }
 
 function isNonEmptyString(value) {
@@ -245,7 +247,7 @@ export function formatInspectorToolResult(result, options = {}) {
   return formatCallResult(result, imageArtifacts);
 }
 
-function runInspectorCli(method, args = [], { toolName = 'figwright' } = {}) {
+function runInspectorCli(method, args = [], { toolName = 'figwright', exitOnFailure = true } = {}) {
   const invocation = [
     ...NPX_ARGS_PREFIX,
     '-y',
@@ -291,7 +293,7 @@ function runInspectorCli(method, args = [], { toolName = 'figwright' } = {}) {
     imageBlocks: extractInspectorImageBlocks(method, envelope),
   };
 
-  if (normalized.status !== 0) {
+  if (normalized.status !== 0 && exitOnFailure) {
     process.stderr.write(
       method === 'tools/call'
         ? formatInspectorToolResult(normalized, { toolName })
@@ -302,13 +304,13 @@ function runInspectorCli(method, args = [], { toolName = 'figwright' } = {}) {
   return normalized;
 }
 
-function callTool(toolName, args) {
+export function callFigwrightTool(toolName, args) {
   return runInspectorCli('tools/call', [
     '--tool-name',
     toolName,
     '--tool-args-json',
     JSON.stringify(args),
-  ], { toolName });
+  ], { toolName, exitOnFailure: false });
 }
 
 export function isSupportedNodeVersion(version) {
@@ -416,15 +418,15 @@ function assertEndToEndPing(result) {
 }
 
 function runPing() {
-  const result = callTool('ping', {});
+  const result = callFigwrightTool('ping', {});
   assertEndToEndPing(result);
   process.stdout.write(formatResult(result));
 }
 
 function runProfile() {
-  const ping = callTool('ping', {});
+  const ping = callFigwrightTool('ping', {});
   const pingPayload = assertEndToEndPing(ping);
-  const metadata = callTool('get_metadata', {});
+  const metadata = callFigwrightTool('get_metadata', {});
   const profile = isMetadataPayload(metadata.payload)
     ? 'figwright-full'
     : 'unknown';
@@ -564,10 +566,10 @@ function readToolArgs(raw) {
 
 function runCall(toolName, rawArgs) {
   if (!toolName) fail('call 需要工具名称。');
-  const result = callTool(toolName, readToolArgs(rawArgs));
-  if (isToolFailure(result)) {
+  const result = callFigwrightTool(toolName, readToolArgs(rawArgs));
+  if (result.status !== 0 || isToolFailure(result)) {
     process.stderr.write(formatInspectorToolResult(result, { toolName }));
-    process.exit(2);
+    process.exit(result.status || 2);
   }
   process.stdout.write(formatInspectorToolResult(result, { toolName }));
 }
