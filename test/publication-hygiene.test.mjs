@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -31,6 +31,14 @@ function listFiles(directory) {
     return entry.isDirectory() ? listFiles(path) : [path];
   });
 }
+
+test('repository excludes development-only publication fixtures', () => {
+  assert.equal(
+    existsSync(resolve(appDir, 'test-fixtures')),
+    false,
+    'test-fixtures is a development-only directory and must not be published',
+  );
+});
 
 test('published skills contain only supported runtime resources', () => {
   for (const skillName of readdirSync(skillsDir)) {
