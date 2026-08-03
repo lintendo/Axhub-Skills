@@ -18,7 +18,6 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 | [`clone-page`](#clone-page) | 根据参考网页还原一个可以继续修改和开发的页面 |
 | [`china-customer-research`](#china-customer-research) | 从真实用户反馈中找到需求、动机和决策依据 |
 | [`react-to-figma-make`](#react-to-figma-make) | 把已有产品页面转换为 Figma Make 可继续编辑的文件 |
-| [`mcp-installer`](#mcp-installer) | 把 AI 需要使用的外部工具接入当前客户端 |
 | [`git-repo-beginner-guide`](#git-repo-beginner-guide) | 帮助不熟悉 Git 的用户安全保存、同步和恢复项目 |
 
 ## 技能说明
@@ -212,25 +211,6 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 
 ```text
 请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/react-to-figma-make 安装 react-to-figma-make 这个技能。
-```
-
-<a id="mcp-installer"></a>
-### `mcp-installer`：为 AI 接入外部工具
-
-**遇到的问题 / 适用场景**
-
-- 想让当前 AI 客户端使用一个外部工具，但不知道应该安装到哪里。
-- 更换电脑、系统或 AI 客户端后，原来的工具配置无法直接使用。
-- 自动安装失败，需要在不破坏现有配置的情况下完成接入。
-
-**解决方法**
-
-使用 `mcp-installer`，识别当前系统和 AI 客户端，选择合适的方式安装 MCP 服务并保留已有配置。
-
-**安装提示词**
-
-```text
-请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/mcp-installer 安装 mcp-installer 这个技能。
 ```
 
 <a id="git-repo-beginner-guide"></a>
