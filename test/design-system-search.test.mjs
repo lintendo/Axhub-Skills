@@ -20,7 +20,7 @@ import { fetchArtifact } from '../skills/design-system-search/scripts/lib/fetch-
 const sha256 = (value) => `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
 const execFileAsync = promisify(execFile);
 
-function record({ id, platform = 'desktop', industries = [], styles = [], density = [], title = id, aliases = [], keywords = [], description = '', designMd = '', reviewStatus = 'deferred', publishable = false, avoid = [], packageUrl, packagePath, designMdPath, previewPath }) {
+function record({ id, platform = 'desktop', industries = [], styles = [], density = [], title = id, aliases = [], keywords = [], description = '', designMd = '', reviewStatus = 'deferred', publishable = false, avoid = [], packageUrl, packagePath, designMdPath, previewPath, previewImagePath }) {
   return {
     schemaVersion: 1,
     id,
@@ -48,6 +48,7 @@ function record({ id, platform = 'desktop', industries = [], styles = [], densit
     artifacts: {
       ...(designMdPath ? { designMdPath } : {}),
       ...(previewPath ? { previewPath } : {}),
+      ...(previewImagePath ? { previewImagePath } : {}),
       ...(packageUrl ? { packageUrl } : {}),
       ...(packagePath ? { packagePath } : {}),
     },
@@ -164,17 +165,20 @@ test('local deferred results expose local artifacts but never invent a public pa
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'design-search-artifact-'));
   const designPath = path.join(root, 'DESIGN.md');
   const previewPath = path.join(root, 'preview.html');
+  const previewImagePath = path.join(root, 'cover.svg');
   const packagePath = path.join(root, 'deferred.tgz');
   await fs.writeFile(designPath, '# Deferred design\n');
   await fs.writeFile(previewPath, '<!doctype html>');
+  await fs.writeFile(previewImagePath, '<svg/>');
   await fs.writeFile(packagePath, 'not publishable');
-  const deferred = record({ id: 'deferred', designMdPath: designPath, previewPath, packagePath, packageUrl: 'https://evil.example/package.tgz' });
+  const deferred = record({ id: 'deferred', designMdPath: designPath, previewPath, previewImagePath, packagePath, packageUrl: 'https://evil.example/package.tgz' });
   const response = await search(request(), { index: indexWith([deferred]), localRoot: root });
   const result = response.results[0];
   assert.equal(result.reviewStatus, 'deferred');
   assert.equal(result.publishable, false);
   assert.equal(result.artifacts.designMd.available, true);
   assert.equal(result.artifacts.preview.available, true);
+  assert.equal(result.artifacts.previewImage.available, true);
   assert.equal(result.artifacts.package.available, false);
   assert.equal(result.artifacts.package.url, undefined);
   const fetched = await fetchArtifact(result, { kind: 'designMd', localRoot: root });
