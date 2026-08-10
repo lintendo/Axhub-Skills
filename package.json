@@ -5,6 +5,7 @@
   "description": "Axhub AI 技能集 - 独立可执行的自动化脚本",
   "type": "module",
   "scripts": {
-    "extract-axure": "node src/extract-axure-data.mjs"
+    "extract-axure": "node src/extract-axure-data.mjs",
+    "test": "node --test test/*.test.mjs"
   }
 }

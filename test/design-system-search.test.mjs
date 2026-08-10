@@ -339,3 +339,36 @@ test('errors are structured with one of the versioned machine error codes', () =
   assert.equal(error.code, 'CACHE_MISS');
   assert.deepEqual(error.details, { path: 'cache' });
 });
+
+test('Skill documents the privacy-preserving selection workflow and versioned references', async () => {
+  const skillRoot = fileURLToPath(new URL('../skills/design-system-search/', import.meta.url));
+  const [skill, agent, query, taxonomy, response, readme] = await Promise.all([
+    fs.readFile(path.join(skillRoot, 'SKILL.md'), 'utf8'),
+    fs.readFile(path.join(skillRoot, 'agents/openai.yaml'), 'utf8'),
+    fs.readFile(path.join(skillRoot, 'references/query-schema.md'), 'utf8'),
+    fs.readFile(path.join(skillRoot, 'references/taxonomy.md'), 'utf8'),
+    fs.readFile(path.join(skillRoot, 'references/response-schema.md'), 'utf8'),
+    fs.readFile(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8'),
+  ]);
+
+  assert.match(skill, /^---\nname: design-system-search\ndescription: Use when[^\n]+\n---\n/u);
+  assert.doesNotMatch(skill.split('---')[1], /short-description|metadata:/u);
+  assert.match(skill, /先把需求整理为结构化查询/u);
+  assert.match(skill, /不得把用户原文传给脚本或网络端点/u);
+  assert.match(skill, /同时搜索 desktop 和 mobile|向用户确认平台/u);
+  assert.match(skill, /matched.*unmatched.*完整.*DESIGN\.md/su);
+  assert.match(skill, /只有.*工作流需要.*下载.*package/su);
+  assert.match(skill, /不得发送.*analytics|不得发送.*use 事件/u);
+  assert.match(agent, /display_name: "Design System Search"/u);
+  assert.match(agent, /default_prompt: "Use \$design-system-search/u);
+  assert.match(query, /searchContractVersion: `1\.0\.0`/u);
+  assert.match(query, /hardFilters/u);
+  for (const dimension of ['industries', 'productTypes', 'pageTypes', 'styles', 'brandTraits', 'colorFamilies', 'colorModes', 'density']) {
+    assert.match(taxonomy, new RegExp(`## ${dimension}\\b`, 'u'));
+  }
+  assert.match(response, /cacheVersion/u);
+  assert.match(response, /reviewStatus/u);
+  assert.match(response, /publishable/u);
+  assert.match(response, /artifacts/u);
+  assert.match(readme, /`design-system-search`/u);
+});
