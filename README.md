@@ -12,6 +12,7 @@
 | **`extract-axure-data`** | **Axure 宇宙解析器** | *“分析这个 Axure 原型链接，深入提取它的精确截图、设计 Token、交互地图和所有的设计标注信息。”* |
 | **`extract-page-data`** | **通用网页深度 X 光机** | *“打开这个页面，帮我输出长截图、提取页面视觉色板代码，并把文案骨架直接转成 Markdown。”* |
 | **`generate-theme`** | **设计系统自动发电机** | *“分析特定页面的视觉风格，直接生成能够用于开发的 `DESIGN.md` 设计体系规范和 Tailwind v4 主题文件。”* |
+| **`design-system-search`** | **隐私优先的设计系统检索器** | *“按平台、行业、页面类型和风格搜索设计知识，读完候选 DESIGN.md 后帮我选一个合适主题。”* |
 | **`genie-editor-client`** | **调整面板属性建模器** | *“帮我把这个页面/元素的 tweak、schema、values、adapter 接上，让它能在 Genie Editor 的调整面板里直接改，并支持页面级属性聚合或多方案 card 切换。”* |
 | **`genie-editor-workflow`** | **可视化交互闭环生命线** | *“检测一下我在浏览器版 Genie Editor 上的新标注卡片，作为处理者接管这些待办，改完代码后切回完成状态。”* |
 | **`react-to-figma-make`** | **Figma Make 离线铸造师** | *“这个 React 项目开发完了，帮我逆向转换为 Figma Make 项目格式，并打包出可直接扔进 Figma 客户端呈现的 `.fig` 二进制文件。”* |

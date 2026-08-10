@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design System Search"
+  short_description: "Search and compare Axhub design knowledge"
+  default_prompt: "Use $design-system-search to find and compare design systems for this product brief."
