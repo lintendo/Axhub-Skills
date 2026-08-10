@@ -271,6 +271,7 @@ function validateRemoteRecordUrls(record, remotePolicy, baseUrl) {
   const preview = record.preview ?? {};
   remoteArtifact(artifacts.designMdUrl ?? artifacts.designMd?.url, artifacts.designMdHash ?? artifacts.designMd?.hash, remotePolicy, baseUrl);
   remoteArtifact(preview.pageUrl ?? artifacts.previewUrl ?? artifacts.preview?.url, preview.pageHash ?? artifacts.previewHash ?? artifacts.preview?.hash, remotePolicy, baseUrl);
+  remoteArtifact(artifacts.previewImageUrl ?? artifacts.previewImage?.url, artifacts.previewImageHash ?? artifacts.previewImage?.hash, remotePolicy, baseUrl);
   remoteArtifact(artifacts.packageUrl ?? artifacts.package?.url, artifacts.packageHash ?? artifacts.package?.hash, remotePolicy, baseUrl);
 }
 
@@ -281,13 +282,15 @@ async function resultArtifacts(record, { remote, localRoot, remotePolicy, baseUr
     return {
       designMd: remoteArtifact(artifacts.designMdUrl ?? artifacts.designMd?.url, artifacts.designMdHash ?? artifacts.designMd?.hash, remotePolicy, baseUrl),
       preview: remoteArtifact(preview.pageUrl ?? artifacts.previewUrl ?? artifacts.preview?.url, preview.pageHash ?? artifacts.previewHash ?? artifacts.preview?.hash, remotePolicy, baseUrl),
+      previewImage: remoteArtifact(artifacts.previewImageUrl ?? artifacts.previewImage?.url, artifacts.previewImageHash ?? artifacts.previewImage?.hash, remotePolicy, baseUrl),
       package: remoteArtifact(artifacts.packageUrl ?? artifacts.package?.url, artifacts.packageHash ?? artifacts.package?.hash, remotePolicy, baseUrl),
     };
   }
   return {
     designMd: await existingLocalArtifact(artifacts.designMdPath ?? artifacts.designMd?.path, artifacts.designMdHash ?? artifacts.designMd?.hash, localRoot),
     preview: await existingLocalArtifact(artifacts.previewPath ?? artifacts.preview?.path ?? preview.pagePath ?? preview.sourcePath, artifacts.previewHash ?? artifacts.preview?.hash, localRoot),
-      package: record.publishable ? await existingLocalArtifact(artifacts.packagePath ?? artifacts.package?.path, artifacts.packageHash ?? artifacts.package?.hash, localRoot) : { available: false },
+    previewImage: await existingLocalArtifact(artifacts.previewImagePath ?? artifacts.previewImage?.path, artifacts.previewImageHash ?? artifacts.previewImage?.hash, localRoot),
+    package: record.publishable ? await existingLocalArtifact(artifacts.packagePath ?? artifacts.package?.path, artifacts.packageHash ?? artifacts.package?.hash, localRoot) : { available: false },
   };
 }
 
