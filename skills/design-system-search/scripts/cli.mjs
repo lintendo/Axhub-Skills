@@ -6,6 +6,22 @@ import { pathToFileURL } from 'node:url';
 import { fetchArtifact } from './lib/fetch-artifact.mjs';
 import { CONTRACT, search } from './lib/index.mjs';
 
+export const DEFAULT_MANIFEST_URL = 'https://lintendo.github.io/Make-Template/knowledge/latest/manifest.json';
+const DEFAULT_ALLOWED_ORIGIN = 'https://lintendo.github.io';
+const DEFAULT_ALLOWED_BASE_PATH = '/Make-Template/knowledge/';
+
+export function resolveSearchSource(options = {}) {
+  if (options.indexPath || options.index) {
+    return options.indexPath ? { indexPath: options.indexPath } : { index: options.index };
+  }
+  if (options.manifestUrl) return { manifestUrl: options.manifestUrl };
+  return {
+    manifestUrl: DEFAULT_MANIFEST_URL,
+    allowedOrigin: DEFAULT_ALLOWED_ORIGIN,
+    allowedBasePath: DEFAULT_ALLOWED_BASE_PATH,
+  };
+}
+
 function parseArgs(argv) {
   const args = [...argv];
   const command = args[0] && !args[0].startsWith('-') ? args.shift() : 'search';
@@ -49,8 +65,14 @@ async function readInput(file) {
 export async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
   const input = await readInput(options.requestPath);
-  if (options.command === 'search') return search(input, options);
-  if (options.command === 'fetch') return fetchArtifact(input, options);
+  if (options.command === 'search') return search(input, { ...options, ...resolveSearchSource(options) });
+  if (options.command === 'fetch') return fetchArtifact(input, {
+    ...(!options.allowedOrigin ? {
+      allowedOrigin: DEFAULT_ALLOWED_ORIGIN,
+      allowedBasePath: DEFAULT_ALLOWED_BASE_PATH,
+    } : {}),
+    ...options,
+  });
   throw Object.assign(new Error('INVALID_REQUEST'), { code: 'INVALID_REQUEST', details: { command: options.command } });
 }
 

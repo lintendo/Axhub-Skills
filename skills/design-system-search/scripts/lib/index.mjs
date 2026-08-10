@@ -111,7 +111,6 @@ function validateIndex(index, request, remote = false) {
     if (!record || typeof record !== 'object' || record.schemaVersion !== 1 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(record.id) || record.slug !== record.id || !platformsValid || !record.platforms.includes(request.platform) || record.searchable !== true || !['approved', 'deferred', 'rejected'].includes(record.reviewStatus) || typeof record.publishable !== 'boolean' || !reasonsValid || !publicationValid || ids.has(record.id)) {
       fail('INVALID_INDEX', { id: record?.id });
     }
-    if (remote && (record.publishable !== true || record.reviewStatus !== 'approved')) fail('INVALID_INDEX', { id: record.id, reason: 'remote-record-not-publishable' });
     ids.add(record.id);
   }
   for (const [token, posting] of Object.entries(index.postings)) {
@@ -131,7 +130,7 @@ function validateManifest(manifest, request) {
   }
   const artifact = manifest.indexes?.[request.platform];
   if (!artifact || typeof artifact.url !== 'string' || !/^sha256:[a-f0-9]{64}$/u.test(artifact.hash) || !Number.isInteger(artifact.count) || artifact.count < 0) fail('INVALID_INDEX', { field: `indexes.${request.platform}` });
-  if (!Array.isArray(manifest.records) || manifest.records.some((record) => !record || record.publishable !== true || record.reviewStatus !== 'approved' || record.searchable !== true || !Array.isArray(record.platforms))) fail('INVALID_INDEX', { reason: 'manifest-record-not-publishable' });
+  if (!Array.isArray(manifest.records) || manifest.records.some((record) => !record || record.searchable !== true || !['approved', 'deferred', 'rejected'].includes(record.reviewStatus) || typeof record.publishable !== 'boolean' || !Array.isArray(record.platforms))) fail('INVALID_INDEX', { reason: 'manifest-record-not-searchable' });
   const manifestPlatformCount = manifest.records.filter((record) => record.platforms.includes(request.platform)).length;
   if (manifestPlatformCount !== artifact.count) fail('INVALID_INDEX', { reason: 'manifest-count-mismatch', expectedCount: artifact.count, actualCount: manifestPlatformCount });
   return artifact;
@@ -283,7 +282,9 @@ async function resultArtifacts(record, { remote, localRoot, remotePolicy, baseUr
       designMd: remoteArtifact(artifacts.designMdUrl ?? artifacts.designMd?.url, artifacts.designMdHash ?? artifacts.designMd?.hash, remotePolicy, baseUrl),
       preview: remoteArtifact(preview.pageUrl ?? artifacts.previewUrl ?? artifacts.preview?.url, preview.pageHash ?? artifacts.previewHash ?? artifacts.preview?.hash, remotePolicy, baseUrl),
       previewImage: remoteArtifact(artifacts.previewImageUrl ?? artifacts.previewImage?.url, artifacts.previewImageHash ?? artifacts.previewImage?.hash, remotePolicy, baseUrl),
-      package: remoteArtifact(artifacts.packageUrl ?? artifacts.package?.url, artifacts.packageHash ?? artifacts.package?.hash, remotePolicy, baseUrl),
+      package: record.publishable
+        ? remoteArtifact(artifacts.packageUrl ?? artifacts.package?.url, artifacts.packageHash ?? artifacts.package?.hash, remotePolicy, baseUrl)
+        : { available: false },
     };
   }
   return {

@@ -102,7 +102,7 @@ export async function fetchArtifact(result, options = {}) {
   const kind = options.kind ?? 'designMd';
   const artifact = result?.artifacts?.[kind];
   if (!artifact?.available && !artifact?.path && !artifact?.url) throw failure('RESULT_NOT_FOUND', { id: result?.id, kind });
-  if (!result?.publishable && artifact?.url) throw failure('RESULT_NOT_FOUND', { id: result?.id, kind, reason: 'deferred-artifact-is-local-only' });
+  if (kind === 'package' && !result?.publishable) throw failure('RESULT_NOT_FOUND', { id: result?.id, kind, reason: 'package-not-authorized' });
   const maxBytes = options.maxBytes ?? DEFAULT_LIMITS[kind] ?? DEFAULT_LIMITS.package;
   let bytes;
   let source;

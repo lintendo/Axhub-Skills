@@ -13,7 +13,7 @@ Turn a design need into a private, structured search; inspect the returned evide
 
 1. 先把需求整理为结构化查询。只提取平台、行业、产品类型、页面类型、风格、品牌气质、色系、明暗模式、密度和关键词。不得把用户原文传给脚本或网络端点。
 2. 确定平台。用户没有指定时，向用户确认平台，或同时搜索 desktop 和 mobile 两份索引；不要擅自默认。
-3. 按 [query-schema.md](references/query-schema.md) 和 [taxonomy.md](references/taxonomy.md) 生成请求，使用 `scripts/cli.mjs search` 在本地检索。
+3. 按 [query-schema.md](references/query-schema.md) 和 [taxonomy.md](references/taxonomy.md) 生成请求。默认使用 `scripts/cli.mjs search` 读取 Make-Template 的线上 manifest；只有在源码工作区或用户明确指定时才传 `--index` 和 `--local-root`。
 4. 对每个候选读取 `matched`、`unmatched`、`scoreBreakdown`、`reviewStatus` 和 `publishable`，再取得完整的 `DESIGN.md` 并查看 preview。不能只按 score 选择。
 5. 结合用户约束说明推荐理由和不匹配项。`deferred` 可用于本地参考，但不得描述为已获公开发布授权。
 6. 只有用户工作流需要落地资源时才下载 package；普通选型只读取 DESIGN.md 和 preview。不得发送 use 事件或 analytics 事件。
@@ -46,8 +46,8 @@ Then pass one returned result to `scripts/cli.mjs fetch --kind designMd` and rea
 | Situation | Action |
 | --- | --- |
 | Platform missing | Confirm, or search both indexes |
-| Local deferred result | Read local DESIGN.md and preview; package stays unavailable |
-| Online result | Accept only the strict published manifest and verified hashes |
+| Deferred result | Read verified DESIGN.md and preview locally或在线；package stays unavailable |
+| Online result | Default to the canonical Make-Template manifest and verified hashes |
 | Too few results | Report `resultSummary.reason`; do not pad or duplicate |
 | Stale cache | State it explicitly; do not silently downgrade |
 

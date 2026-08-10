@@ -19,7 +19,7 @@ searchContractVersion: `1.0.0`
 
 ## Result review
 
-Read `matched`, `unmatched`, `scoreBreakdown`, `reviewStatus`, `publishable`, and `artifacts` before choosing. A high score is not a substitute for reading the full `DESIGN.md`. Deferred records may expose local DESIGN.md and preview paths but never a public package URL.
+Read `matched`, `unmatched`, `scoreBreakdown`, `reviewStatus`, `publishable`, and `artifacts` before choosing. A high score is not a substitute for reading the full `DESIGN.md`. Deferred records may expose local or verified online DESIGN.md and preview artifacts but never a package URL.
 
 ## Error codes
 

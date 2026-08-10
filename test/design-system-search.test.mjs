@@ -220,7 +220,8 @@ test('remote artifact fetching enforces HTTPS origin/base path, redirects, hashe
   await assert.rejects(() => fetchArtifact(result, { kind: 'designMd', fetch: redirectFetch, allowedOrigin: 'https://cdn.example.test', allowedBasePath: '/knowledge' }), (error) => error.code === 'UNSAFE_ARTIFACT_URL');
   await assert.rejects(() => fetchArtifact(result, { kind: 'designMd', fetch: safeFetch, allowedOrigin: 'https://cdn.example.test', allowedBasePath: '/knowledge', maxBytes: 2 }), (error) => error.code === 'FETCH_FAILED');
   await assert.rejects(() => fetchArtifact({ ...result, artifacts: { designMd: { url: result.artifacts.designMd.url, hash: sha256('wrong') } } }, { kind: 'designMd', fetch: safeFetch, allowedOrigin: 'https://cdn.example.test', allowedBasePath: '/knowledge' }), (error) => error.code === 'ARTIFACT_HASH_MISMATCH');
-  await assert.rejects(() => fetchArtifact({ ...result, publishable: false }, { kind: 'designMd', fetch: safeFetch, allowedOrigin: 'https://cdn.example.test', allowedBasePath: '/knowledge' }), (error) => error.code === 'RESULT_NOT_FOUND');
+  const deferredFetched = await fetchArtifact({ ...result, publishable: false }, { kind: 'designMd', fetch: safeFetch, allowedOrigin: 'https://cdn.example.test', allowedBasePath: '/knowledge' });
+  assert.equal(deferredFetched.body, body);
   await assert.rejects(() => fetchArtifact({ ...result, artifacts: { designMd: { url: 'https://cdn.example.test/knowledge/%2f..%2fsecret', hash: expectedHash } } }, { kind: 'designMd', fetch: safeFetch, allowedOrigin: 'https://cdn.example.test', allowedBasePath: '/knowledge' }), (error) => error.code === 'UNSAFE_ARTIFACT_URL');
 });
 
@@ -272,6 +273,60 @@ test('remote search validates the manifest index hash against exact response byt
     : new Response(exactBytes);
   const response = await search(request(), { manifestUrl: 'https://cdn.example.test/knowledge/manifest.json', fetch: fetcher, cacheDir });
   assert.deepEqual(response.results.map((item) => item.id), ['published']);
+  await fs.rm(cacheDir, { recursive: true, force: true });
+});
+
+test('remote deferred results expose discovery artifacts but never a package', async () => {
+  const deferred = {
+    ...record({ id: 'remote-deferred', reviewStatus: 'deferred', publishable: false }),
+    artifacts: {
+      designMdUrl: 'https://cdn.example.test/knowledge/designs/remote-deferred/DESIGN.md',
+      designMdHash: sha256('# Deferred\n'),
+      previewUrl: 'https://cdn.example.test/knowledge/previews/remote-deferred/index.html',
+      previewHash: sha256('<!doctype html>'),
+      previewImageUrl: 'https://cdn.example.test/knowledge/previews/remote-deferred/cover.svg',
+      previewImageHash: sha256('<svg/>'),
+    },
+  };
+  const index = indexWith([deferred]);
+  const indexBytes = Buffer.from(JSON.stringify(index));
+  const fetcher = async (url) => {
+    const value = String(url);
+    if (value.endsWith('/manifest.json')) {
+      return new Response(JSON.stringify({
+        schemaVersion: 1,
+        taxonomyVersion: '1.0.0',
+        searchContractVersion: '1.0.0',
+        tokenizationVersion: 'nfkc-intl-segmenter-v1',
+        minReaderVersion: '1.0.0',
+        maxReaderVersionExclusive: '2.0.0',
+        records: [deferred],
+        indexes: { desktop: { url: 'indexes/desktop.json', hash: sha256(indexBytes), count: 1 } },
+      }));
+    }
+    if (value.endsWith('/indexes/desktop.json')) return new Response(indexBytes);
+    if (value.endsWith('/DESIGN.md')) return new Response('# Deferred\n');
+    throw new Error(`Unexpected URL: ${value}`);
+  };
+  const cacheDir = await fs.mkdtemp(path.join(os.tmpdir(), 'design-search-remote-deferred-'));
+  const response = await search(request(), {
+    manifestUrl: 'https://cdn.example.test/knowledge/manifest.json',
+    fetch: fetcher,
+    cacheDir,
+  });
+  const result = response.results[0];
+  assert.equal(result.reviewStatus, 'deferred');
+  assert.equal(result.artifacts.designMd.available, true);
+  assert.equal(result.artifacts.preview.available, true);
+  assert.equal(result.artifacts.previewImage.available, true);
+  assert.equal(result.artifacts.package.available, false);
+  const fetched = await fetchArtifact(result, {
+    kind: 'designMd',
+    fetch: fetcher,
+    allowedOrigin: 'https://cdn.example.test',
+    allowedBasePath: '/knowledge',
+  });
+  assert.equal(fetched.body, '# Deferred\n');
   await fs.rm(cacheDir, { recursive: true, force: true });
 });
 
@@ -338,6 +393,22 @@ test('CLI executes from paths with spaces and returns one machine-readable JSON 
   await fs.rm(root, { recursive: true, force: true });
 });
 
+test('CLI defaults to the canonical Make-Template manifest while explicit sources win', async () => {
+  const cli = await import('../skills/design-system-search/scripts/cli.mjs');
+  assert.equal(cli.DEFAULT_MANIFEST_URL, 'https://lintendo.github.io/Make-Template/knowledge/latest/manifest.json');
+  assert.deepEqual(cli.resolveSearchSource({}), {
+    manifestUrl: cli.DEFAULT_MANIFEST_URL,
+    allowedOrigin: 'https://lintendo.github.io',
+    allowedBasePath: '/Make-Template/knowledge/',
+  });
+  assert.deepEqual(cli.resolveSearchSource({ manifestUrl: 'https://custom.example/knowledge/manifest.json' }), {
+    manifestUrl: 'https://custom.example/knowledge/manifest.json',
+  });
+  assert.deepEqual(cli.resolveSearchSource({ indexPath: '/tmp/desktop.json' }), {
+    indexPath: '/tmp/desktop.json',
+  });
+});
+
 test('errors are structured with one of the versioned machine error codes', () => {
   const error = new DesignKnowledgeSearchError('CACHE_MISS', { path: 'cache' });
   assert.equal(error.code, 'CACHE_MISS');
@@ -361,6 +432,7 @@ test('Skill documents the privacy-preserving selection workflow and versioned re
   assert.match(skill, /不得把用户原文传给脚本或网络端点/u);
   assert.match(skill, /同时搜索 desktop 和 mobile|向用户确认平台/u);
   assert.match(skill, /matched.*unmatched.*完整.*DESIGN\.md/su);
+  assert.match(skill, /默认.*线上.*manifest|线上.*默认/u);
   assert.match(skill, /只有.*工作流需要.*下载.*package/su);
   assert.match(skill, /不得发送.*analytics|不得发送.*use 事件/u);
   assert.match(agent, /display_name: "Design System Search"/u);
