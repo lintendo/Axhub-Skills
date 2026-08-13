@@ -1,9 +1,9 @@
 ---
-name: design-system-search
-description: Use when selecting a design system or theme for a product, page, prototype, or implementation through Axhub design knowledge indexes.
+name: search-design-system
+description: Use when selecting an existing design system or theme for a product, page, prototype, or implementation through Axhub design knowledge indexes; not when creating or updating a theme.
 ---
 
-# Design System Search
+# Search Design System
 
 ## Overview
 

@@ -8,17 +8,37 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { search, DesignKnowledgeSearchError } from '../skills/design-system-search/scripts/lib/index.mjs';
-import { scoreRecord } from '../skills/design-system-search/scripts/lib/score.mjs';
+import { search, DesignKnowledgeSearchError } from '../skills/search-design-system/scripts/lib/index.mjs';
+import { scoreRecord } from '../skills/search-design-system/scripts/lib/score.mjs';
 import {
   cacheObject,
   readCachedObject,
   cacheKeyFor,
-} from '../skills/design-system-search/scripts/lib/cache.mjs';
-import { fetchArtifact } from '../skills/design-system-search/scripts/lib/fetch-artifact.mjs';
+} from '../skills/search-design-system/scripts/lib/cache.mjs';
+import { fetchArtifact } from '../skills/search-design-system/scripts/lib/fetch-artifact.mjs';
 
 const sha256 = (value) => `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
 const execFileAsync = promisify(execFile);
+
+test('search-design-system is the canonical skill name', async () => {
+  const canonicalRoot = fileURLToPath(new URL('../skills/search-design-system/', import.meta.url));
+  const legacyRoot = fileURLToPath(new URL('../skills/design-system-search/', import.meta.url));
+  const canonicalExists = await fs.access(canonicalRoot).then(() => true, () => false);
+  const legacyExists = await fs.access(legacyRoot).then(() => true, () => false);
+
+  assert.equal(canonicalExists, true);
+  assert.equal(legacyExists, false);
+});
+
+test('default cache directory follows the canonical skill name', async () => {
+  const moduleSource = await fs.readFile(
+    fileURLToPath(new URL('../skills/search-design-system/scripts/lib/index.mjs', import.meta.url)),
+    'utf8',
+  );
+
+  assert.match(moduleSource, /path\.join\(platformRoot, 'axhub', 'search-design-system'\)/u);
+  assert.doesNotMatch(moduleSource, /path\.join\(platformRoot, 'axhub', 'design-system-search'\)/u);
+});
 
 function record({ id, platform = 'desktop', industries = [], styles = [], density = [], title = id, aliases = [], keywords = [], description = '', designMd = '', reviewStatus = 'deferred', publishable = false, avoid = [], packageUrl, packagePath, designMdPath, previewPath, previewImagePath }) {
   return {
@@ -385,7 +405,7 @@ test('CLI executes from paths with spaces and returns one machine-readable JSON 
   const requestPath = path.join(root, 'request.json');
   await fs.writeFile(indexPath, JSON.stringify(indexWith([record({ id: 'cli-result' })])));
   await fs.writeFile(requestPath, JSON.stringify(request()));
-  const cliPath = fileURLToPath(new URL('../skills/design-system-search/scripts/cli.mjs', import.meta.url));
+  const cliPath = fileURLToPath(new URL('../skills/search-design-system/scripts/cli.mjs', import.meta.url));
   const { stdout, stderr } = await execFileAsync(process.execPath, [cliPath, 'search', '--index', indexPath, '--request', requestPath]);
   assert.equal(stderr, '');
   const parsed = JSON.parse(stdout);
@@ -394,7 +414,7 @@ test('CLI executes from paths with spaces and returns one machine-readable JSON 
 });
 
 test('CLI defaults to the canonical Make-Template manifest while explicit sources win', async () => {
-  const cli = await import('../skills/design-system-search/scripts/cli.mjs');
+  const cli = await import('../skills/search-design-system/scripts/cli.mjs');
   assert.equal(cli.DEFAULT_MANIFEST_URL, 'https://lintendo.github.io/Make-Template/knowledge/latest/manifest.json');
   assert.deepEqual(cli.resolveSearchSource({}), {
     manifestUrl: cli.DEFAULT_MANIFEST_URL,
@@ -416,7 +436,7 @@ test('errors are structured with one of the versioned machine error codes', () =
 });
 
 test('Skill documents the privacy-preserving selection workflow and versioned references', async () => {
-  const skillRoot = fileURLToPath(new URL('../skills/design-system-search/', import.meta.url));
+  const skillRoot = fileURLToPath(new URL('../skills/search-design-system/', import.meta.url));
   const [skill, agent, query, taxonomy, response, readme] = await Promise.all([
     fs.readFile(path.join(skillRoot, 'SKILL.md'), 'utf8'),
     fs.readFile(path.join(skillRoot, 'agents/openai.yaml'), 'utf8'),
@@ -426,7 +446,8 @@ test('Skill documents the privacy-preserving selection workflow and versioned re
     fs.readFile(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8'),
   ]);
 
-  assert.match(skill, /^---\nname: design-system-search\ndescription: Use when[^\n]+\n---\n/u);
+  assert.match(skill, /^---\nname: search-design-system\ndescription: Use when[^\n]+\n---\n/u);
+  assert.match(skill.split('---')[1], /not when creating or updating/u);
   assert.doesNotMatch(skill.split('---')[1], /short-description|metadata:/u);
   assert.match(skill, /先把需求整理为结构化查询/u);
   assert.match(skill, /不得把用户原文传给脚本或网络端点/u);
@@ -435,8 +456,8 @@ test('Skill documents the privacy-preserving selection workflow and versioned re
   assert.match(skill, /默认.*线上.*manifest|线上.*默认/u);
   assert.match(skill, /只有.*工作流需要.*下载.*package/su);
   assert.match(skill, /不得发送.*analytics|不得发送.*use 事件/u);
-  assert.match(agent, /display_name: "Design System Search"/u);
-  assert.match(agent, /default_prompt: "Use \$design-system-search/u);
+  assert.match(agent, /display_name: "Search Design System"/u);
+  assert.match(agent, /default_prompt: "Use \$search-design-system/u);
   assert.match(query, /searchContractVersion: `1\.0\.0`/u);
   assert.match(query, /hardFilters/u);
   for (const dimension of ['industries', 'productTypes', 'pageTypes', 'styles', 'brandTraits', 'colorFamilies', 'colorModes', 'density']) {
@@ -446,5 +467,5 @@ test('Skill documents the privacy-preserving selection workflow and versioned re
   assert.match(response, /reviewStatus/u);
   assert.match(response, /publishable/u);
   assert.match(response, /artifacts/u);
-  assert.match(readme, /`design-system-search`/u);
+  assert.match(readme, /`search-design-system`/u);
 });

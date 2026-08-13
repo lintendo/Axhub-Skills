@@ -183,7 +183,7 @@ function defaultCacheDir() {
   const configured = process.platform === 'win32' ? process.env.LOCALAPPDATA : process.env.XDG_CACHE_HOME;
   const fallback = process.platform === 'win32' ? path.join(os.homedir(), 'AppData', 'Local') : path.join(os.homedir(), '.cache');
   const platformRoot = configured && path.isAbsolute(configured) ? configured : fallback;
-  return path.join(platformRoot, 'axhub', 'design-system-search');
+  return path.join(platformRoot, 'axhub', 'search-design-system');
 }
 
 async function loadRemoteIndex(request, options) {
