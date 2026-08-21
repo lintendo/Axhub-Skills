@@ -12,6 +12,7 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 | [`axhub-prototype-context`](#axhub-prototype-context) | 让 AI 读取带标注原型的页面、PRD、标注和源码 |
 | [`extract-axure-data`](#extract-axure-data) | 读取 Axure 原型的页面、交互、标注和视觉信息 |
 | [`generate-theme`](#generate-theme) | 把参考页面整理成可复用的设计规范和项目主题 |
+| [`search-design-system`](#search-design-system) | 从现有设计知识中检索并比较合适的设计系统或主题 |
 | [`axhub-commentary`](#axhub-commentary) | 读取页面批注、完成修改并同步处理状态 |
 | [`figma-content-operator`](#figma-content-operator) | 让 AI 读取、修改、导出 Figma 内容并关联项目代码 |
 | [`extract-page-data`](#extract-page-data) | 把普通网页整理成截图、文案、颜色、字体和链接资料 |
@@ -96,6 +97,25 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 
 ```text
 请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/generate-theme 安装 generate-theme 这个技能。
+```
+
+<a id="search-design-system"></a>
+### `search-design-system`：选择现有设计系统或主题
+
+**遇到的问题 / 适用场景**
+
+- 产品或页面还没有确定设计基底，希望先比较已有方案。
+- 需要按平台、行业、页面类型和风格筛选设计知识。
+- 希望先读取候选的 `DESIGN.md` 和预览，再决定采用哪个主题。
+
+**解决方法**
+
+使用 `search-design-system`，从 Axhub 设计知识索引中检索候选并比较设计规范；它不负责创建或修改主题。
+
+**安装提示词**
+
+```text
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/search-design-system 安装 search-design-system 这个技能。
 ```
 
 <a id="axhub-commentary"></a>
