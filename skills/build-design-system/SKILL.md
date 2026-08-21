@@ -1,5 +1,5 @@
 ---
-name: generate-theme
+name: build-design-system
 description: >
   从网页中采集设计令牌并生成完整的 DESIGN.md 设计规范文档 + Tailwind CSS 主题文件。
   当用户提供 URL 并要求"提取主题"、"生成设计规范"、"导出设计系统"、
@@ -8,9 +8,7 @@ description: >
   每个 token 类别均有推荐/允许/禁止三级规范，可直接放入项目根目录供 AI 编码工具使用。
 ---
 
-# 生成主题
-
-> 此能力已迁移到 `$build-design-system`。新任务优先使用新名称；当前入口继续兼容已有安装与调用。
+# 构建设计系统
 
 从目标网页采集设计令牌，生成 DESIGN.md 设计规范 + Tailwind CSS 主题。
 
