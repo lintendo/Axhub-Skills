@@ -11,8 +11,8 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 | [`axhub-annotation-standalone`](#axhub-annotation-standalone) | 让原型同时展示页面标注、PRD 目录和说明文档 |
 | [`axhub-prototype-context`](#axhub-prototype-context) | 让 AI 读取带标注原型的页面、PRD、标注和源码 |
 | [`extract-axure-data`](#extract-axure-data) | 读取 Axure 原型的页面、交互、标注和视觉信息 |
-| [`generate-theme`](#generate-theme) | 把参考页面整理成可复用的设计规范和项目主题 |
 | [`search-design-system`](#search-design-system) | 从现有设计知识中检索并比较合适的设计系统或主题 |
+| [`build-design-system`](#build-design-system) | 把参考页面整理成可复用的设计规范和项目主题 |
 | [`axhub-commentary`](#axhub-commentary) | 读取页面批注、完成修改并同步处理状态 |
 | [`figma-content-operator`](#figma-content-operator) | 让 AI 读取、修改、导出 Figma 内容并关联项目代码 |
 | [`extract-page-data`](#extract-page-data) | 把普通网页整理成截图、文案、颜色、字体和链接资料 |
@@ -80,8 +80,8 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/extract-axure-data 安装 extract-axure-data 这个技能。
 ```
 
-<a id="generate-theme"></a>
-### `generate-theme`：从参考页面生成设计规范
+<a id="build-design-system"></a>
+### `build-design-system`：从参考页面构建设计系统
 
 **遇到的问题 / 适用场景**
 
@@ -91,12 +91,12 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 
 **解决方法**
 
-使用 `generate-theme`，分析参考页面的视觉规律，生成 `DESIGN.md` 设计规范和可以直接用于项目的 Tailwind v4 主题。
+使用 `build-design-system`，分析参考页面的视觉规律，生成 `DESIGN.md` 设计规范和可以直接用于项目的 Tailwind v4 主题。
 
 **安装提示词**
 
 ```text
-请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/generate-theme 安装 generate-theme 这个技能。
+请从 https://github.com/lintendo/Axhub-Skills/tree/main/skills/build-design-system 安装 build-design-system 这个技能。
 ```
 
 <a id="search-design-system"></a>
