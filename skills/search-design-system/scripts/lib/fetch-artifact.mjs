@@ -4,6 +4,7 @@ import path from 'node:path';
 import { sha256 } from './cache.mjs';
 
 const DEFAULT_LIMITS = Object.freeze({ manifest: 1024 * 1024, index: 20 * 1024 * 1024, designMd: 2 * 1024 * 1024, preview: 5 * 1024 * 1024, package: 100 * 1024 * 1024 });
+const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 
 function failure(code, details = {}) {
   const error = new Error(code);
@@ -103,6 +104,9 @@ export async function fetchArtifact(result, options = {}) {
   const artifact = result?.artifacts?.[kind];
   if (!artifact?.available && !artifact?.path && !artifact?.url) throw failure('RESULT_NOT_FOUND', { id: result?.id, kind });
   if (kind === 'package' && !result?.publishable) throw failure('RESULT_NOT_FOUND', { id: result?.id, kind, reason: 'package-not-authorized' });
+  if (!artifact.path && artifact.url && !HASH_PATTERN.test(String(artifact.hash ?? ''))) {
+    throw failure('ARTIFACT_HASH_MISMATCH', { id: result?.id, kind, reason: 'hash-required-or-invalid' });
+  }
   const maxBytes = options.maxBytes ?? DEFAULT_LIMITS[kind] ?? DEFAULT_LIMITS.package;
   let bytes;
   let source;

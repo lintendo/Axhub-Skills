@@ -6,6 +6,8 @@ import { cacheObject, readCachedObject, readCachedRef, sha256 } from './cache.mj
 import { assertSafeUrl, fetchRemoteBytes } from './fetch-artifact.mjs';
 import { isExcluded, matchesHardFilters, scoreRecord } from './score.mjs';
 
+const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
+
 export const READER_VERSION = '1.0.0';
 export const CONTRACT = Object.freeze({
   schemaVersion: 1,
@@ -258,20 +260,21 @@ async function existingLocalArtifact(candidate, hash, localRoot) {
   }
 }
 
-function remoteArtifact(url, hash, remotePolicy, baseUrl) {
+function remoteArtifact(url, hash, remotePolicy, baseUrl, field) {
   if (typeof url !== 'string' || !url) return { available: false };
   const resolved = new URL(url, baseUrl).href;
   assertSafeUrl(resolved, remotePolicy);
-  return { available: true, source: 'remote', url: resolved, ...(hash ? { hash } : {}) };
+  if (!HASH_PATTERN.test(String(hash ?? ''))) fail('INVALID_INDEX', { field: `${field}.hash` });
+  return { available: true, source: 'remote', url: resolved, hash };
 }
 
 function validateRemoteRecordUrls(record, remotePolicy, baseUrl) {
   const artifacts = record.artifacts ?? {};
   const preview = record.preview ?? {};
-  remoteArtifact(artifacts.designMdUrl ?? artifacts.designMd?.url, artifacts.designMdHash ?? artifacts.designMd?.hash, remotePolicy, baseUrl);
-  remoteArtifact(preview.pageUrl ?? artifacts.previewUrl ?? artifacts.preview?.url, preview.pageHash ?? artifacts.previewHash ?? artifacts.preview?.hash, remotePolicy, baseUrl);
-  remoteArtifact(artifacts.previewImageUrl ?? artifacts.previewImage?.url, artifacts.previewImageHash ?? artifacts.previewImage?.hash, remotePolicy, baseUrl);
-  remoteArtifact(artifacts.packageUrl ?? artifacts.package?.url, artifacts.packageHash ?? artifacts.package?.hash, remotePolicy, baseUrl);
+  remoteArtifact(artifacts.designMdUrl ?? artifacts.designMd?.url, artifacts.designMdHash ?? artifacts.designMd?.hash, remotePolicy, baseUrl, 'artifacts.designMd');
+  remoteArtifact(preview.pageUrl ?? artifacts.previewUrl ?? artifacts.preview?.url, preview.pageHash ?? artifacts.previewHash ?? artifacts.preview?.hash, remotePolicy, baseUrl, 'artifacts.preview');
+  remoteArtifact(artifacts.previewImageUrl ?? artifacts.previewImage?.url, artifacts.previewImageHash ?? artifacts.previewImage?.hash, remotePolicy, baseUrl, 'artifacts.previewImage');
+  remoteArtifact(artifacts.packageUrl ?? artifacts.package?.url, artifacts.packageHash ?? artifacts.package?.hash, remotePolicy, baseUrl, 'artifacts.package');
 }
 
 async function resultArtifacts(record, { remote, localRoot, remotePolicy, baseUrl }) {
@@ -279,11 +282,11 @@ async function resultArtifacts(record, { remote, localRoot, remotePolicy, baseUr
   const preview = record.preview ?? {};
   if (remote) {
     return {
-      designMd: remoteArtifact(artifacts.designMdUrl ?? artifacts.designMd?.url, artifacts.designMdHash ?? artifacts.designMd?.hash, remotePolicy, baseUrl),
-      preview: remoteArtifact(preview.pageUrl ?? artifacts.previewUrl ?? artifacts.preview?.url, preview.pageHash ?? artifacts.previewHash ?? artifacts.preview?.hash, remotePolicy, baseUrl),
-      previewImage: remoteArtifact(artifacts.previewImageUrl ?? artifacts.previewImage?.url, artifacts.previewImageHash ?? artifacts.previewImage?.hash, remotePolicy, baseUrl),
+      designMd: remoteArtifact(artifacts.designMdUrl ?? artifacts.designMd?.url, artifacts.designMdHash ?? artifacts.designMd?.hash, remotePolicy, baseUrl, 'artifacts.designMd'),
+      preview: remoteArtifact(preview.pageUrl ?? artifacts.previewUrl ?? artifacts.preview?.url, preview.pageHash ?? artifacts.previewHash ?? artifacts.preview?.hash, remotePolicy, baseUrl, 'artifacts.preview'),
+      previewImage: remoteArtifact(artifacts.previewImageUrl ?? artifacts.previewImage?.url, artifacts.previewImageHash ?? artifacts.previewImage?.hash, remotePolicy, baseUrl, 'artifacts.previewImage'),
       package: record.publishable
-        ? remoteArtifact(artifacts.packageUrl ?? artifacts.package?.url, artifacts.packageHash ?? artifacts.package?.hash, remotePolicy, baseUrl)
+        ? remoteArtifact(artifacts.packageUrl ?? artifacts.package?.url, artifacts.packageHash ?? artifacts.package?.hash, remotePolicy, baseUrl, 'artifacts.package')
         : { available: false },
     };
   }

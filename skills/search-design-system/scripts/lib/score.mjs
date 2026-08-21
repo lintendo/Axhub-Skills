@@ -66,11 +66,14 @@ export function matchesHardFilters(record, hardFilters = {}) {
 }
 
 export function isExcluded(record, exclude = {}) {
-  const candidate = normalizedSet([
-    ...SEMANTIC_FIELDS.flatMap((field) => fieldValues(record, field)),
-    ...strings(record.avoid ?? record.semantic?.avoid ?? record.annotation?.avoid),
-  ]);
-  return SEMANTIC_FIELDS.some((field) => strings(exclude[field]).some((value) => candidate.has(normalizeValue(value))));
+  const avoided = normalizedSet(strings(record.avoid ?? record.semantic?.avoid ?? record.annotation?.avoid));
+  return SEMANTIC_FIELDS.some((field) => {
+    const candidate = normalizedSet(fieldValues(record, field));
+    return strings(exclude[field]).some((value) => {
+      const normalized = normalizeValue(value);
+      return candidate.has(normalized) || avoided.has(normalized);
+    });
+  });
 }
 
 export function scoreRecord(record, request) {
