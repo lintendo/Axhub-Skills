@@ -97,7 +97,13 @@ export function AnnotationStandaloneReactExample() {
           }}
         >
           <h2>新建发布任务</h2>
-          <button type="button" onClick={() => setModalOpen(false)}>关闭</button>
+          <button
+            type="button"
+            data-annotation-id="modal-close-target"
+            onClick={() => setModalOpen(false)}
+          >
+            关闭
+          </button>
         </section>
       </div>
 

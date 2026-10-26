@@ -8,7 +8,7 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 
 | 技能 | 一句话用途 |
 | --- | --- |
-| [`axhub-annotation-standalone`](#axhub-annotation-standalone) | 让原型同时展示页面标注、PRD 目录和说明文档 |
+| [`axhub-annotation-standalone`](#axhub-annotation-standalone) | 优先用侧边栏文档展示 PRD，关联页面元素并按需补充标注 |
 | [`axhub-prototype-context`](#axhub-prototype-context) | 让 AI 读取带标注原型的页面、PRD、标注和源码 |
 | [`extract-axure-data`](#extract-axure-data) | 读取 Axure 原型的页面、交互、标注和视觉信息 |
 | [`search-design-system`](#search-design-system) | 从现有设计知识中检索并比较合适的设计系统或主题 |
@@ -34,7 +34,7 @@ Axhub 出品的 AI Skills 集合，帮助产品经理、设计师和研发把原
 
 **解决方法**
 
-使用 `axhub-annotation-standalone`，把已有的目录、PRD 和页面标注展示在原型中，让查看者边操作边理解需求。
+使用 `axhub-annotation-standalone`，优先把 PRD 和需求说明放在侧边栏文档中，让查看者边操作原型边阅读；通过文档链接定位页面元素，按需补充元素标注和状态控件。
 
 **安装提示词**
 

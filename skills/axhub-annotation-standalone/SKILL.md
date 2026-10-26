@@ -1,11 +1,19 @@
 ---
 name: axhub-annotation-standalone
-description: Use when adding @axhub/annotation to standalone React apps, plain HTML pages, Vite prototypes, or other web hosts that need annotation markers, directories, Markdown notes, or state controls.
+description: Use when adding @axhub/annotation to standalone React apps, plain HTML pages, Vite prototypes, or other web hosts that need sidebar documents, prototype navigation, annotation markers, or state controls.
 ---
 
 # Axhub Annotation Standalone
 
-在独立 Web 项目中使用 `@axhub/annotation` 时，用这个技能。它只说明运行时接入：页面已有标注数据，只需要展示 marker、标注面板、目录和状态控件。
+在独立 Web 项目中使用 `@axhub/annotation` 时，用这个技能。它说明如何把已有需求说明和标注数据接入运行时，展示侧边栏文档、原型目录、页面标注和状态控件。
+
+## 推荐方案
+
+用户未指定标注形式时，优先推荐侧边栏文档，让查看者边操作原型边阅读需求说明。
+
+- PRD、业务流程和完整需求说明放在 `documents.nodes`，优先使用 Markdown；省略 `readerMode` 或设为 `"split"`，默认侧边栏分屏阅读。需要整篇阅读时再设为 `"full"`。
+- 文档需要关联页面元素时，用 `[查看元素](#axhub-target:element-id)` 链接到已有标注节点，或通过 `targets[]` 登记只需定位的元素。
+- 元素需要独立说明或可切换状态时，再按需添加 `data.nodes[]` marker 和 `controls`；完整 PRD 正文集中在文档中维护。
 
 ## 参考案例
 
@@ -17,6 +25,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 
 ## 接入前提
 
+- 如果相关 API 或功能验收能力缺失，优先提醒用户检查 `@axhub/annotation` 是否因版本过旧而缺少对应能力。
 - 标注数据使用一份 `AnnotationSourceDocument`，静态 import 或由宿主 loader 返回。
 - 被标注元素优先加稳定属性，例如 `data-annotation-id`。
 - React 18 / Vite 等现代宿主可以安装 `@axhub/annotation` 并走 ESM。
@@ -49,25 +58,29 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 
 ## 数据要点
 
-- `directory.nodes` 放 `folder` / `route` / `markdown` / `link`，不需要 `locator`。
-- `type: "markdown"` 目录文档可以直接写 `markdown` 正文。
-- 需要把目录文档拆成 `.md` 文件时，可以写 `markdownPath`，例如 `docs/prd-03-status.md`；这是构建侧约定，运行时仍读取内联后的 `markdown`。
-- `markdownPath` 只用于目录文档，不用于 marker 标注节点。
+- `directory.nodes` 只放原型导航 `folder` / `route` / `link`，不需要 `locator`。
+- `documents.nodes` 放独立文档目录，只用 `folder` / `markdown` / `html`；Markdown 节点可以直接写 `markdown` 正文，也可以写 `markdownPath`，HTML 节点可以直接写 `html` 正文，也可以写 `htmlPath`。未指定 `readerMode` 时默认以侧边栏分屏阅读。
+- HTML 节点会在 `sandbox="allow-scripts"` iframe 中执行，支持普通 JavaScript、canvas 图表、动画和交互；脚本不能直接访问父页面 DOM。HTML 中的标准 `#anchor` 会通过运行时桥接，由阅读器像 Markdown 锚点一样控制 iframe 内跳转。
+- 文档 Markdown 和 HTML 都可以用 `[查看详情](#axhub-target:modal-close-target)` 定位当前页面的标注或普通目标。HTML 点击该链接会通过运行时桥接到与 Markdown 相同的目标定位逻辑。
+- 文档 Markdown 和 HTML 都支持相对 `.md`、`.markdown`、`.html`、`.htm` 链接；只有当前目录中存在唯一匹配路径时才在阅读器内切换文章。
 - `data.nodes[]` 放页面 marker，必须有能在宿主页面解析到的 `locator`。
 - marker 只属于某些页面或状态时，写 `pageId`。
 - 长正文用 `hasMarkdown: true` + `markdownMap[node.id]`。
 - 状态标注写节点 `controls`；JSON 里只放可序列化字段。
+- `targets[]` 放没有标注正文、但需要被文档链接定位的页面元素；保持 `id` 稳定并提供 `locator`。
 - 页面有对话框或遮罩层时，检查实际 DOM，把包含内容的活动层根选择器写入 `presentation.layerSelectors`。
 - `sourceReference` 不放在 JSON 数据源里，只描述发布包中的源码清单位置，不内联源码文件。
 
 ## 验收
 
 1. 启动宿主预览。
-2. 确认目标元素上出现 marker。
-3. 点击 marker，能看到短标注或 Markdown 正文。
-4. 打开目录，验证 `route`、`markdown`、`link`。
-5. 修改状态控件，确认 React 状态或普通 DOM 同步变化。
-6. 检查控制台是否有 import、peer dependency 或 locator 错误。
+2. 在每个纳入验收的页面/状态执行 `validateAnnotationRuntime(source, { pageId })`；`errors` 阻断交付，`warnings` 只提示改进。
+3. 使用文档目录时，验证正文按配置阅读（默认侧边栏分屏）；如有目标链接，点击并确认标注或普通目标能被定位。
+4. 使用原型目录时，验证 `route`、`link`。
+5. 使用 marker 时，确认目标元素上出现 marker；marker 已正常显示时，静态 locator 或 fingerprint 偏差不单独阻断。
+6. 使用 marker 时，点击后能看到短标注或 Markdown 正文；marker 是否指向正确业务元素由视觉或人工复验确认。
+7. 使用状态控件时，修改控件并确认 React 状态或普通 DOM 同步变化。
+8. 检查控制台是否有 import、peer dependency 或 locator 错误。
 
 ## 常见错误
 
@@ -75,4 +88,5 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 - 不要为了让静态页可见而手写标注 UI；HTML 模式也必须使用 `@axhub/annotation` 的 browser runtime。
 - 不要在普通 HTML 模式里先跳到 Vite/ESM 接入；最短路径是 browser bundle + `window.AxhubAnnotation.createAnnotationViewer(...)`。
 - 不要依赖脆弱的生成 CSS 选择器；能加 `data-annotation-id` 就加。
+- 不要把文档 Markdown 放进 `directory`；文档统一放在 `documents`。
 - 不要期待 `route` 自动跳转；宿主必须在 `onDirectoryRoute` 里处理。

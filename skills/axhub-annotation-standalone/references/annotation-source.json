@@ -100,6 +100,17 @@
     "overview-hero": "# 独立接入说明\n\n`@axhub/annotation` 只负责运行时展示。宿主页面负责提供数据源、稳定选择器和目录 route 行为。"
   },
   "assetMap": {},
+  "targets": [
+    {
+      "id": "modal-close-target",
+      "pageId": "overview",
+      "locator": {
+        "selectors": ["[data-annotation-id=\"modal-close-target\"]"],
+        "fingerprint": "button|modal-close-target",
+        "path": []
+      }
+    }
+  ],
   "directory": {
     "nodes": [
       {
@@ -121,17 +132,38 @@
             "route": "states"
           },
           {
-            "type": "markdown",
-            "id": "doc-usage",
-            "title": "接入说明",
-            "markdown": "# 接入说明\n\nReact 使用 `AnnotationViewer`；普通 HTML 使用 `createAnnotationViewer`。"
-          },
-          {
             "type": "link",
             "id": "docs-link",
             "title": "包文档",
             "href": "https://www.npmjs.com/package/@axhub/annotation",
             "target": "blank"
+          }
+        ]
+      }
+    ]
+  },
+  "documents": {
+    "nodes": [
+      {
+        "type": "folder",
+        "id": "docs",
+        "title": "文档",
+        "defaultExpanded": true,
+        "children": [
+          {
+            "type": "markdown",
+            "id": "doc-usage",
+            "title": "接入说明",
+            "markdownPath": "docs/doc-usage.md",
+            "markdown": "# 接入说明\n\nReact 使用 `AnnotationViewer`；普通 HTML 使用 `createAnnotationViewer`。\n\n[查看弹窗关闭按钮](#axhub-target:modal-close-target)\n\n[查看 HTML 文档](./chart.html)"
+          },
+          {
+            "type": "html",
+            "id": "doc-chart",
+            "title": "HTML 图表",
+            "htmlPath": "docs/chart.html",
+            "readerMode": "split",
+            "html": "<h1 id=\"chart\">HTML 图表</h1><p><a href=\"#details\">查看说明</a> · <a href=\"#axhub-target:modal-close-target\">定位关闭按钮</a></p><canvas id=\"chart-canvas\" width=\"320\" height=\"120\"></canvas><section id=\"details\"><h2>说明</h2></section><script>const canvas = document.getElementById('chart-canvas'); const context = canvas.getContext('2d'); context.fillStyle = '#0f766e'; context.fillRect(0, 0, 120, 24);</script>"
           }
         ]
       }
