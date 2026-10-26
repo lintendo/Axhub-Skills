@@ -39,6 +39,8 @@ export function AnnotationStandaloneReactExample() {
 
   const options = React.useMemo<AnnotationViewerOptions>(() => ({
     currentPageId: pageId,
+    // 只有文档、没有元素标注时也保留文档入口。
+    emptyWhenNoData: true,
     showToolbar: true,
     showThemeToggle: true,
     showColorFilter: true,
@@ -97,7 +99,13 @@ export function AnnotationStandaloneReactExample() {
           }}
         >
           <h2>新建发布任务</h2>
-          <button type="button" onClick={() => setModalOpen(false)}>关闭</button>
+          <button
+            type="button"
+            data-annotation-id="modal-close-target"
+            onClick={() => setModalOpen(false)}
+          >
+            关闭
+          </button>
         </section>
       </div>
 
