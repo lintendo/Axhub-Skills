@@ -14,6 +14,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 - PRD、业务流程和完整需求说明放在 `documents.nodes`，优先使用 Markdown；省略 `readerMode` 或设为 `"split"`，默认侧边栏分屏阅读。需要整篇阅读时再设为 `"full"`。
 - 文档需要关联页面元素时，用 `[查看元素](#axhub-target:element-id)` 链接到已有标注节点，或通过 `targets[]` 登记只需定位的元素。
 - 元素需要独立说明或可切换状态时，再按需添加 `data.nodes[]` marker 和 `controls`；完整 PRD 正文集中在文档中维护。
+- 只有文档或定位目标、没有元素标注时，React `AnnotationViewer` 和普通 HTML `createAnnotationViewer` 都需传入 `options.emptyWhenNoData: true`，让文档入口正常挂载。
 
 ## 参考案例
 
@@ -60,6 +61,7 @@ description: Use when adding @axhub/annotation to standalone React apps, plain H
 
 - `directory.nodes` 只放原型导航 `folder` / `route` / `link`，不需要 `locator`。
 - `documents.nodes` 放独立文档目录，只用 `folder` / `markdown` / `html`；Markdown 节点可以直接写 `markdown` 正文，也可以写 `markdownPath`，HTML 节点可以直接写 `html` 正文，也可以写 `htmlPath`。未指定 `readerMode` 时默认以侧边栏分屏阅读。
+- `markdownPath` / `htmlPath` 是文档路径元数据，运行时不会自动读取文件。文档正文分文件维护时，宿主构建流程或 loader 必须先把文件内容内联到 `markdown` / `html`；直接用 `file://` 打开时，把正文随页面一起内嵌。
 - HTML 节点会在 `sandbox="allow-scripts"` iframe 中执行，支持普通 JavaScript、canvas 图表、动画和交互；脚本不能直接访问父页面 DOM。HTML 中的标准 `#anchor` 会通过运行时桥接，由阅读器像 Markdown 锚点一样控制 iframe 内跳转。
 - 文档 Markdown 和 HTML 都可以用 `[查看详情](#axhub-target:modal-close-target)` 定位当前页面的标注或普通目标。HTML 点击该链接会通过运行时桥接到与 Markdown 相同的目标定位逻辑。
 - 文档 Markdown 和 HTML 都支持相对 `.md`、`.markdown`、`.html`、`.htm` 链接；只有当前目录中存在唯一匹配路径时才在阅读器内切换文章。
