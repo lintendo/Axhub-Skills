@@ -12,8 +12,9 @@ Read the published context from an annotated prototype so an AI Agent can unders
 1. Open the requested annotated prototype URL with Playwright, Browser, Chrome, or an equivalent tool that can evaluate page JavaScript.
 2. Wait until the app renders, then poll briefly for `window.__AXHUB_ANNOTATION_SOURCE__`.
 3. Evaluate and return that value. Do not modify the object or write anything back to `window`.
-4. If the value is missing, report the URL, page title, relevant console errors, and that the annotated prototype context snapshot was not published.
-5. If the user asks to submit a review report back to Axhub Make, read `references/review-report-submission.md`.
+4. When full Markdown annotation text is needed, also read `window.__AXHUB_ANNOTATION_SOURCE_DOCUMENT__?.markdownMap`; report when it is unavailable.
+5. If the snapshot is missing, report the URL, page title, relevant console errors, and that the annotated prototype context snapshot was not published.
+6. If the user asks to submit a review report back to Axhub Make, read `references/review-report-submission.md`.
 
 Minimal page evaluation:
 
@@ -24,9 +25,10 @@ const source = await page.evaluate(() => window.__AXHUB_ANNOTATION_SOURCE__);
 
 ## What To Report
 
-- Directory / PRD outline from `source.directory`.
-- Markdown or PRD entries from directory nodes with `type: "markdown"`.
+- Page navigation from `source.directory` (`folder`, `route`, and `link` nodes).
+- PRD/document outline and article bodies from `source.documents` (`folder`, `markdown`, and `html` nodes). Read each Markdown article's inline `markdown` and each HTML article's inline `html`; report a missing body when only `markdownPath` or `htmlPath` is present. Also check legacy `directory` document nodes when present.
 - Annotation count and the important node fields: `id`, `title`, `pageId`, `locator`, `annotationText`, `aiPrompt`, `color`, and `controls`.
+- Markdown annotation bodies for `source.nodes` with `hasMarkdown: true` are in the source document's `markdownMap[node.id]`; do not mistake them for PRD articles. Include `source.targets` when explaining document links to unannotated page elements.
 - Source handoff from `source.source` when present. Report `root` and `manifest`; when source is needed, read the manifest and relevant files via `root`.
 - Mention whether images are attached by checking `images.length`; do not download images unless the user asks.
 
@@ -35,7 +37,10 @@ const source = await page.evaluate(() => window.__AXHUB_ANNOTATION_SOURCE__);
 ```ts
 type AnnotationSourceRuntimeSnapshot = {
   directory: AnnotationDirectory | null;
+  documents: AnnotationDocumentDirectory | null;
   nodes: AnnotationNode[];
+  targets?: AnnotationElementTarget[];
+  presentation?: AnnotationSourcePresentation;
   source?: {
     root?: string;
     manifest?: string;
@@ -43,7 +48,10 @@ type AnnotationSourceRuntimeSnapshot = {
 };
 ```
 
-- `directory.nodes` is the prototype tree. Node types are `folder`, `route`, `link`, and `markdown`.
+- `directory.nodes` is the page navigation tree. New PRD documents belong in `documents.nodes`; older sources may still contain `markdown` nodes in `directory`.
+- `documents.nodes` contains `folder`, `markdown`, and `html` nodes. Readable Markdown nodes have an inline `markdown` body and may include `markdownPath`; HTML nodes have an inline `html` body and may include `htmlPath`. In Make, these files typically live under `src/prototypes/<prototype-id>/docs/`. The host must inline their contents before publishing the snapshot; the runtime does not fetch document files from their paths.
+- `readerMode: "full" | "split"` controls an article's initial layout; omitted values default to `split`. Documents and pages have separate directory entries.
+- Relative links between articles resolve through unique, normalized `markdownPath` or `htmlPath` values. Standard HTML `#anchor` links are bridged to the reader so they use the same controlled in-document navigation as Markdown, while a link such as `[View element](#axhub-target:element-id)` refers to an annotation node or a lightweight `targets` entry in both Markdown and HTML. Cross-page positioning requires host routing (`onTargetRoute`, or a matching directory route fallback); the snapshot alone does not establish that navigation works.
 - `nodes` is the full annotation list, independent of current page, selected state, and color filter.
 - Each annotation node includes `id`, `index`, optional `title`, optional `pageId`, `locator`, `aiPrompt`, `annotationText`, `hasMarkdown`, `color`, `images`, optional `controls`, `createdAt`, and `updatedAt`.
 - `source` is only a source-code discovery reference. In HTML published with source included, `manifest` points to `source/manifest.json`; resolve its paths relative to `source.root`.
